@@ -58,6 +58,8 @@ local S_PATH=`docker inspect -f '{{json .Mounts }}' $D_NAME | jq .[].Source | gr
 [ "$S_PATH" == "" ] && echo Could not find a source path for $D_NAME && return
 
 
+[ ! -d $D_PATH ] && mkdir -p $D_PATH
+
 if [ ! -f $BACKUP_LOCATION/$D_NAME/backup.config ]
 then
 touch $BACKUP_LOCATION/$D_NAME/backup.config
@@ -116,8 +118,6 @@ echo Backing up existing files in $D_PATH to $A_FILE
 echo tar -czf $A_FILE -C $D_PATH .
 tar -czf $A_FILE -C $D_PATH .
 fi
-
-[ ! -d $D_PATH ] && mkdir -p $D_PATH
 
 docker inspect $D_NAME > $BACKUP_LOCATION/$D_NAME/$D_NAME-dockerconfig.json
 
