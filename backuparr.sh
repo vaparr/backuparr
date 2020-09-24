@@ -50,7 +50,7 @@ backup_docker() {
     [ ! -d $T_PATH ] && mkdir -p $T_PATH
     docker inspect $D_NAME >$T_PATH/$D_NAME-dockerconfig.json
 
-    local S_PATH=$(docker inspect -f '{{json .Mounts }}' $D_NAME | jq .[].Source | grep appdata | head -1 | cut -f 2 -d \" | tr -d '\n')
+    local S_PATH=$(docker inspect -f '{{json .Mounts }}' $D_NAME | jq .[].Source | grep appdata/ | head -1 | cut -f 2 -d \" | tr -d '\n')
 
     [ ! -d $S_PATH ] && echo Could not find $S_PATH && return
     [ "$S_PATH" == "" ] && echo Could not find a source path for $D_NAME && return
