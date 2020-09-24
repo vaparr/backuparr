@@ -47,11 +47,17 @@ done
 backup_docker(){
 local TIMEOUT=$DEFAULT_TIMEOUT
 local D_NAME=$1
-local D_PATH=$BACKUP_LOCATION/$D_NAME/Live
+local T_PATH=$BACKUP_LOCATION/Docker/$D_NAME
+local D_PATH=$T_PATH/Live
 local BACKUP="true"
 local FORCESTART="false"
 
 [ "$1" == "" ] && echo Docker is a required param && return
+
+[ ! -d $T_PATH ] && mkdir -p $T_PATH
+docker inspect $D_NAME > $T_PATH/$D_NAME-dockerconfig.json
+
+
 
 local S_PATH=`docker inspect -f '{{json .Mounts }}' $D_NAME | jq .[].Source | grep appdata | head -1| cut -f 2 -d \" | tr -d '\n'`
 [ ! -d $S_PATH ] && echo Could not find $S_PATH && return
@@ -60,39 +66,39 @@ local S_PATH=`docker inspect -f '{{json .Mounts }}' $D_NAME | jq .[].Source | gr
 
 [ ! -d $D_PATH ] && mkdir -p $D_PATH
 
-if [ ! -f $BACKUP_LOCATION/$D_NAME/backup.config ]
+if [ ! -f $T_PATH/backup.config ]
 then
-touch $BACKUP_LOCATION/$D_NAME/backup.config
+touch $T_PATH/backup.config
 fi
 
-local BACKUPCONFIG=`cat $BACKUP_LOCATION/$D_NAME/backup.config 2>/dev/null | egrep -v ^# | egrep -v ^$`
+local BACKUPCONFIG=`cat $T_PATH/backup.config 2>/dev/null | egrep -v ^# | egrep -v ^$`
 if [ "$BACKUPCONFIG" == "" ]
 then
-echo \# docker timeout before force kill. Set to 0 to not stop the docker when backing it up > $BACKUP_LOCATION/$D_NAME/backup.config
-echo \#TIMEOUT=30 >> $BACKUP_LOCATION/$D_NAME/backup.config >> $BACKUP_LOCATION/$D_NAME/backup.config
-echo "" >> $BACKUP_LOCATION/$D_NAME/backup.config
-echo \#false will prevent the docker from being backed up. Default True >> $BACKUP_LOCATION/$D_NAME/backup.config
-echo \#BACKUP=\"false\" >> $BACKUP_LOCATION/$D_NAME/backup.config
-echo "" >> $BACKUP_LOCATION/$D_NAME/backup.config
-echo \#true will start the docker even if it wasnt running when the backup started >> $BACKUP_LOCATION/$D_NAME/backup.config
-echo \#FORCESTART=\"true\" >> $BACKUP_LOCATION/$D_NAME/backup.config
+echo \# docker timeout before force kill. Set to 0 to not stop the docker when backing it up > $T_PATH/backup.config
+echo \#TIMEOUT=30 >> $T_PATH/backup.config
+echo "" >> $T_PATH/backup.config
+echo \#false will prevent the docker from being backed up. Default True >> $T_PATH/backup.config
+echo \#BACKUP=\"false\" >> $T_PATH/backup.config
+echo "" >> $T_PATH/backup.config
+echo \#true will start the docker even if it wasnt running when the backup started >> $T_PATH/backup.config
+echo \#FORCESTART=\"true\" >> $T_PATH/backup.config
 else
-echo Loading Variables from $BACKUP_LOCATION/$D_NAME/backup.config
-. $BACKUP_LOCATION/$D_NAME/backup.config
+echo Loading Variables from $T_PATH/backup.config
+. $T_PATH/backup.config
 
 fi
 
 if [ $create_only == 1 ]
 then
 echo ------------ $D_NAME ----------------
-echo $BACKUP_LOCATION/$D_NAME/backup.config was created.
+echo $T_PATH/backup.config was created.
 return
 fi
 
 
 [ ! "$BACKUP" == "true" ] && echo Skipping Docker $D_NAME && return
 
-local A_PATH=$BACKUP_LOCATION/$D_NAME/Archive
+local A_PATH=$T_PATH/Archive
 local A_FILE=$A_PATH/$D_NAME-${now}.tgz
 
 
@@ -119,7 +125,6 @@ echo tar -czf $A_FILE -C $D_PATH .
 tar -czf $A_FILE -C $D_PATH .
 fi
 
-docker inspect $D_NAME > $BACKUP_LOCATION/$D_NAME/$D_NAME-dockerconfig.json
 
 if [ $RUNNING == "true" ] && [ ! $TIMEOUT == "0" ]
 then
