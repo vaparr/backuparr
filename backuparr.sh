@@ -15,7 +15,7 @@ ONEDRIVE_LOCATION=onedrive:unraid/backup-docker
 
 #DRYRUN="--dry-run"
 DRYRUN=""
-EXCLUDE=( www/nextcloud profile/cache2 cache2/entries log/ Log/ logs/ Logs/ '*.log' log.txt '*.log.*' Caches/ '*.pid' '*.sample' '*.lock' )
+EXCLUDE=( www/Dashboard Server/Cache Server/Metadata Server/Media www/nextcloud home/.icons profile/cache2 cache2/entries log/ Log/ logs/ Logs/ '*.log' log.txt '*.log.*' Caches/ '*.pid' '*.sample' '*.lock' )
 EXCLUDEPRE=( '*.db' '*.xml' '*.dat' '*.dat.old' '*.db-*' '*.ini' '*.conf' '*.json' '*.ejs' BT_backup/ databases/ '*.sqlite*' '*.sqlite' )
 now=`date +"%Y-%m-%d"`
 
@@ -39,6 +39,7 @@ local D_PATH=$BACKUP_LOCATION/$D_NAME/Live
 [ "$2" == "" ] && Docker is a required param && return
 local A_PATH=$BACKUP_LOCATION/$D_NAME/Archive
 local A_FILE=$A_PATH/$D_NAME-${now}.tgz
+
 local S_PATH=`docker inspect -f '{{json .Mounts }}' $D_NAME | jq .[].Source | grep appdata | head -1| cut -f 2 -d \" | tr -d '\n'`
 
 local RUNNING=`docker container inspect -f '{{.State.Running}}' $D_NAME`
@@ -54,6 +55,7 @@ echo Archive FileName: $A_FILE
 echo Running: "$RUNNING"
 echo ========================================
 [ ! -d $S_PATH ] && echo Could not find $S_PATH && return
+[ "$S_PATH" == "" ] && echo Could not find a source path for $D_NAME && return
 
 [ ! -d $A_PATH ] && [ ! $NUM_DAILY == "0" ] && mkdir -p $A_PATH
 if [ -d $A_PATH ] && [ ! -f $A_FILE ] && [ -d $D_PATH ] && [ ! $NUM_DAILY == "0" ]
@@ -90,20 +92,22 @@ fi
 
 
 }
+if [ -d /boot ]
+then
+    [ ! -d $BACKUP_LOCATION/Flash ] && mkdir -p $BACKUP_LOCATION/Flash
+    rsync -a -h --delete --progress /boot $BACKUP_LOCATION/Flash
+    mv $BACKUP_LOCATION/Flash/config/super.dat $BACKUP_LOCATION/Flash/config/super.dat.CA_BACKUP
+fi
+
 for container in $containers
 do
    backup_docker 20 $container
 done
 
-if [ -d /boot ]
-then
-    if [ ! -d $BACKUP_LOCATION/Flash] && mkdir -p $BACKUP_LOCATION/Flash
-    rsync --progress /boot $BACKUP_LOCATION/Flash
-    mv $BACKUP_LOCATION/Flash/config/super.dat $BACKUP_LOCATION/Flash/config/super.dat.CA_BACKUP
-fi
+echo ---- Backup Complete ---
 
 exit
-
+echo "Starting Onedrive upload"
 /usr/sbin/rclone sync -v --transfers 16 --fast-list --copy-links $BACKUP_LOCATION $ONEDRIVE_LOCATION
 #/usr/sbin/rclone sync -v --transfers 16 --fast-list --progress --copy-links $BACKUP_LOCATION $ONEDRIVE_LOCATION
 #/usr/sbin/rclone sync -v /mnt/user/CommunityApplicationsAppdataBackup/ onedrive:unraid/backup
