@@ -144,9 +144,6 @@ fi
 
 }
 
-backup_docker Firefox
-exit
-
 if [ ! $create_only == "1" ]
 then
 if [ -d /boot ]
