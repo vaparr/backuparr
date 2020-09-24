@@ -1,10 +1,12 @@
+#set -x
+
 BACKUP_LOCATION=/mnt/user/backup
 NUM_DAILY=7
 ONEDRIVE_LOCATION=onedrive:unraid/backup-docker
 DEFAULT_TIMEOUT=30
 #DRYRUN="--dry-run"
 DRYRUN=""
-EXCLUDE=(www/Dashboard Server/Cache Server/Metadata Server/Media www/nextcloud home/.icons profile/cache2 cache2/entries log/ Log/ logs/ Logs/ '*.log' log.txt '*.log.*' Caches/ '*.pid' '*.sample' '*.lock')
+EXCLUDE=(www/Dashboard Plex?Media?Server/Cache Plex?Media?Server/Media Plex?Media?Server/Metadata www/nextcloud home/.icons profile/cache2 cache2/entries log/ Log/ logs/ Logs/ '*.log' log.txt '*.log.*' Caches/ '*.pid' '*.sample' '*.lock')
 EXCLUDEPRE=('*.db' '*.xml' '*.dat' '*.dat.old' '*.db-*' '*.ini' '*.conf' '*.json' '*.ejs' BT_backup/ databases/ '*.sqlite*' '*.sqlite')
 now=$(date +"%Y-%m-%d")
 create_only=0
@@ -29,6 +31,7 @@ exclude_opts=()
 for item in "${EXCLUDE[@]}"; do
     exclude_opts+=(--exclude "$item")
 done
+
 exclude_opts_pre=${exclude_opts[@]}
 for item in "${EXCLUDEPRE[@]}"; do
     exclude_opts_pre+=(--exclude "$item")
@@ -157,4 +160,3 @@ echo "---- Onedrive upload Complete ----"
 #rsync -a --progress -h /mnt/user/appdata/plex/Library/Application\ Support/Plex\ Media\ Server/Plug-in\ Support/ /mnt/user/backup/plexbackup/Plug-in\ Support/
 #rsync -a --progress -h /mnt/user/appdata/plex/Library/Application\ Support/Plex\ Media\ Server/Preferences.xml /mnt/user/backup/plexbackup/
 #docker start plex
-#set -x
