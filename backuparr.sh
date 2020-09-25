@@ -44,6 +44,7 @@ backup_docker() {
     local D_PATH=$T_PATH/Live
     local BACKUP="true"
     local FORCESTART="false"
+    local EXCLUDES=""
 
     [ "$1" == "" ] && echo Docker is a required param && return
 
@@ -75,6 +76,9 @@ backup_docker() {
         echo "" >>$T_PATH/backup.config
         echo \#true will start the docker even if it wasnt running when the backup started >>$T_PATH/backup.config
         echo \#FORCESTART=\"true\" >>$T_PATH/backup.config
+        echo "" >>$T_PATH/backup.config
+        echo \#Per Docker Excludes >> $T_PATH/backup.config
+        echo \#EXCLUDES=\(fail2ban/filter.d Plex?Media?Server/Cache \'*.tmp\'\) >> $T_PATH/backup.config
     else
         echo Loading Variables from $T_PATH/backup.config
         . $T_PATH/backup.config
@@ -85,6 +89,22 @@ backup_docker() {
         echo $T_PATH/backup.config was created.
         return
     fi
+
+local pre_excludes=${exclude_opts_pre[@]}
+local full_exludes=${exclude_opts[@]}
+
+if [ ! "$EXCLUDES" == "" ]
+then
+
+for item in "${EXCLUDES[@]}"; do
+    pre_excludes+=(--exclude "$item")
+done
+for item in "${EXCLUDES[@]}"; do
+    full_excludes+=(--exclude "$item")
+done
+
+fi
+
 
     [ ! "$BACKUP" == "true" ] && echo Skipping Docker $D_NAME && return
 
@@ -112,16 +132,16 @@ backup_docker() {
     fi
 
     if [ $RUNNING == "true" ] && [ ! $TIMEOUT == "0" ]; then
-        echo rsync -a --info=progress2 -h ${exclude_opts_pre[@]} $DRYRUN $S_PATH/ $D_PATH/
-        rsync -a --info=progress2 -h ${exclude_opts_pre[@]} $DRYRUN $S_PATH/ $D_PATH/
+        echo rsync -a --info=progress2 -h ${pre_excludes[@]} $DRYRUN $S_PATH/ $D_PATH/
+        rsync -a --info=progress2 -h ${pre_excludes[@]} $DRYRUN $S_PATH/ $D_PATH/
         echo Stopping $D_NAME with timeout: $TIMEOUT
         echo stopped docker $(docker stop -t $TIMEOUT $D_NAME)
     else
         echo Skipping Docker Stop
     fi
 
-    echo rsync -a --progress -h ${exclude_opts[@]} --delete $DRYRUN $S_PATH/ $D_PATH/
-    rsync -a --progress -h ${exclude_opts[@]} --delete $DRYRUN $S_PATH/ $D_PATH/
+    echo rsync -a --progress -h ${full_excludes[@]} --delete $DRYRUN $S_PATH/ $D_PATH/
+    rsync -a --progress -h ${full_excludes[@]} --delete $DRYRUN $S_PATH/ $D_PATH/
     
     if [[ ! "$FORCESTART" == "false" ]] || [[ $RUNNING == "true" && ! $TIMEOUT == "0" ]]; then
         echo Starting $D_NAME
@@ -131,6 +151,7 @@ backup_docker() {
     [ -d $DAILY_LOCATION ] && [ ! $NUM_DAILY == "0" ] && find $A_PATH -mtime +${NUM_DAILY} -name '*.tgz' -delete
 
 }
+
 
 if [ ! $create_only == "1" ]; then
     if [ -d /boot ]; then
@@ -144,6 +165,9 @@ for container in $containers; do
     backup_docker $container
 done
 
+if [ $create_only == "1" ]; then
+exit
+fi
 echo ---- Backup Complete ----
 
 echo "---- Starting Onedrive upload ----"
