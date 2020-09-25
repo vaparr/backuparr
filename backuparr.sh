@@ -6,7 +6,7 @@ ONEDRIVE_LOCATION=onedrive:unraid/backup
 DEFAULT_TIMEOUT=30
 #DRYRUN="--dry-run"
 DRYRUN=""
-EXCLUDE=(www/Dashboard Plex?Media?Server/Cache Plex?Media?Server/Media Plex?Media?Server/Metadata data/metadata www/nextcloud home/.icons profile/cache2 cache2/entries log/ Log/ logs/ Logs/ '*.log' log.txt '*.log.*' cache/ Caches/ '*.pid' '*.sample' '*.lock')
+EXCLUDE=(profile/lock fail2ban/filter.d www/Dashboard Plex?Media?Server/Cache Plex?Media?Server/Media Plex?Media?Server/Metadata data/metadata www/nextcloud home/.icons profile/cache2 cache2/entries log/ Log/ logs/ Logs/ '*.log' log.txt '*.log.*' cache/ Caches/ '*.pid' '*.sample' '*.lock')
 EXCLUDEPRE=('*.db' '*.xml' '*.dat' '*.dat.old' '*.db-*' '*.ini' '*.conf' '*.json' '*.ejs' BT_backup/ databases/ '*.sqlite*' '*.sqlite')
 now=$(date +"%Y-%m-%d")
 create_only=0
@@ -147,7 +147,7 @@ done
 echo ---- Backup Complete ----
 
 echo "---- Starting Onedrive upload ----"
-/usr/sbin/rclone sync -v --transfers 16 --fast-list --copy-links $BACKUP_LOCATION $ONEDRIVE_LOCATION
+/usr/sbin/rclone sync -v --checkers 16 --transfers 16 --fast-list --copy-links $BACKUP_LOCATION $ONEDRIVE_LOCATION
 echo "---- Onedrive upload Complete ----"
 
 #/usr/sbin/rclone sync -v --transfers 16 --fast-list --progress --copy-links $BACKUP_LOCATION $ONEDRIVE_LOCATION
