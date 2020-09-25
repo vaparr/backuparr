@@ -5,6 +5,7 @@ NUM_DAILY=7
 ONEDRIVE_LOCATION=onedrive:unraid/backup
 DEFAULT_TIMEOUT=30
 DRYRUN=""
+PROGRESS="--info=progress2"
 EXCLUDE=(profile/lock fail2ban/filter.d www/Dashboard Plex?Media?Server/Cache Plex?Media?Server/Media Plex?Media?Server/Metadata data/metadata www/nextcloud home/.icons profile/cache2 cache2/entries log/ Log/ logs/ Logs/ '*.log' log.txt '*.log.*' cache/ Caches/ '*.pid' '*.sample' '*.lock')
 EXCLUDEPRE=('*.db' '*.xml' '*.dat' '*.dat.old' '*.db-*' '*.ini' '*.conf' '*.json' '*.ejs' BT_backup/ databases/ '*.sqlite*' '*.sqlite')
 
@@ -28,6 +29,7 @@ while getopts "h?cfdv" opt; do
         ;;
     v)
         verbose=1
+        PROGRESS="--progress"
         ;;
     #f) 
         #output_file=$OPTARG
@@ -104,11 +106,12 @@ backup_docker() {
 
     local pre_excludes=${exclude_opts_pre[@]}
     local full_excludes=${exclude_opts[@]}
+    
 
     if [ ! "$EXCLUDES" == "" ]; then
 
         for item in "${EXCLUDES[@]}"; do
-            pre_excludes+=(--exclude "$item")
+            pre_excludes+=(--exclude "$item")            
         done
         for item in "${EXCLUDES[@]}"; do
             full_excludes+=(--exclude "$item")
@@ -121,52 +124,68 @@ backup_docker() {
     local A_PATH=$T_PATH/Archive
     local A_FILE=$A_PATH/$D_NAME-${now}.tgz
     local RUNNING=$(docker container inspect -f '{{.State.Running}}' $D_NAME)
-
+    
+    echo =================================================================
+    echo Docker: $D_NAME [Start Time: $(date)]
+    echo =================================================================
+    printf "Dest Path: \t $D_PATH\n"
+    printf "Source Path: \t $S_PATH\n"
+    printf "Archive Path: \t $A_PATH\n"
+    printf "Archive File: \t $A_FILE\n"
+    printf "Running: \t $RUNNING\n"
+    printf "Stop Timeout: \t $TIMEOUT\n"
+    # [ ! "$EXCLUDES" == "" ] && printf "EXCLUDES: \t $EXCLUDES\n"
     echo ""
-    echo ========================================
-    echo Docker Name: $D_NAME
-    echo Dest Path: $D_PATH
-    echo Source Path: $S_PATH
-    echo Archive Path: $A_PATH
-    echo Archive FileName: $A_FILE
-    echo Running: "$RUNNING"
-    echo Docker Timeout: $TIMEOUT
-    echo ========================================
 
     [ ! -d $A_PATH ] && [ ! "$NUM_DAILY" == "0" ] && mkdir -p $A_PATH
-    if [ -d $A_PATH ] && [ ! -f $A_FILE ] && [ -d $D_PATH ] && [ ! "$NUM_DAILY" == "0" ] && [ "$dry_run" == "0" ]; then
-        echo
-        echo Backing up existing files in $D_PATH to $A_FILE
+    
+    echo PHASE 1: Backup existing files in $D_PATH to $A_FILE
+    if [ -d $A_PATH ] && [ ! -f $A_FILE ] && [ -d $D_PATH ] && [ ! "$NUM_DAILY" == "0" ] && [ "$dry_run" == "0" ]; then        
         echo tar -czf $A_FILE -C $D_PATH .
         tar -czf $A_FILE -C $D_PATH .
-    fi
-
-    if [ "$RUNNING" == "true" ] && [ ! "$TIMEOUT" == "0" ]; then
-        [ "$verbose" == "1" ] && echo PRE - rsync -a --info=progress2 -h ${pre_excludes[@]} $DRYRUN $S_PATH/ $D_PATH/
-        rsync -a --info=progress2 -h ${pre_excludes[@]} $DRYRUN $S_PATH/ $D_PATH/
-        echo Stopping $D_NAME with timeout: $TIMEOUT
-        [ "$dry_run" == "0" ] && echo stopped docker $(docker stop -t $TIMEOUT $D_NAME)
     else
-        echo Skipping Docker Stop
+        echo PHASE 1: Skipped. NUM_DAILY [$NUM_DAILY], DRY_RUN [$DRY_RUN]
     fi
-
-    [ "$verbose" == "1" ] && echo POST - rsync -a --progress -h ${full_excludes[@]} --delete $DRYRUN $S_PATH/ $D_PATH/
-    rsync -a --progress -h ${full_excludes[@]} --delete $DRYRUN $S_PATH/ $D_PATH/
-
+    
+    echo PHASE 2: Run rsync to copy files BEFORE docker stop
+    if [ "$RUNNING" == "true" ] && [ ! "$TIMEOUT" == "0" ]; then        
+        [ "$verbose" == "1" ] && echo PHASE 2: rsync -a $PROGRESS -h ${pre_excludes[@]} $DRYRUN $S_PATH/ $D_PATH/
+        rsync -a $PROGRESS -h ${pre_excludes[@]} $DRYRUN $S_PATH/ $D_PATH/
+        echo PHASE 2: Stopping $D_NAME with timeout: $TIMEOUT
+        [ "$dry_run" == "0" ] && echo PHASE 2: Stopped docker $(docker stop -t $TIMEOUT $D_NAME)
+    else
+        echo PHASE 2: Skipped because either docker state [$RUNNING] is not running or Timeout [$TIMEOUT] specified as 0 to prevent docker stop.
+    fi
+    
+    echo PHASE 3: Run rsync to copy files AFTER docker stop
+    [ "$verbose" == "1" ] && echo PHASE 3: rsync -a $PROGRESS -h ${full_excludes[@]} --delete $DRYRUN $S_PATH/ $D_PATH/
+    rsync -a $PROGRESS -h ${full_excludes[@]} --delete $DRYRUN $S_PATH/ $D_PATH/
+    
+    echo "PHASE 4: Start docker if previously running"
     if [[ ! "$FORCESTART" == "false" ]] || [[ "$RUNNING" == "true" && ! "$TIMEOUT" == "0" ]]; then
-        echo Starting $D_NAME
-        [ "$dry_run" == "0" ] && echo started docker $(docker start $D_NAME)
+        echo PHASE 4: Starting $D_NAME
+        [ "$dry_run" == "0" ] && echo PHASE 4: Started docker $(docker start $D_NAME)
+    else
+        echo PHASE 4: Skipped.. FORCESTART [$FORCESTART], RUNNING [$RUNNING], TIMEOUT [$TIMEOUT]
     fi
 
     [ "$dry_run" == "0" ] && [ -d $DAILY_LOCATION ] && [ ! "$NUM_DAILY" == "0" ] && find $A_PATH -mtime +${NUM_DAILY} -name '*.tgz' -delete
 
+    echo ""
+    echo End Time: $(date)
+    echo =================================================================
+    echo ""
 }
+
+echo ""
+echo ---- Backup Started [$(date)] ----
+echo ""
 
 if [ ! "$create_only" == "1" ]; then
     if [ -d /boot ]; then
         [ ! -d $BACKUP_LOCATION/Flash ] && mkdir -p $BACKUP_LOCATION/Flash
-        [ "$verbose" == "1" ] && echo rsync -a -h --delete --progress $DRYRUN /boot $BACKUP_LOCATION/Flash
-        rsync -a -h --delete --progress $DRYRUN /boot $BACKUP_LOCATION/Flash
+        [ "$verbose" == "1" ] && echo rsync -a -h --delete $PROGRESS $DRYRUN /boot $BACKUP_LOCATION/Flash
+        rsync -a -h --delete $PROGRESS $DRYRUN /boot $BACKUP_LOCATION/Flash
         [ "$dry_run" == "0" ] && mv $BACKUP_LOCATION/Flash/boot/config/super.dat $BACKUP_LOCATION/Flash/boot/config/super.dat.CA_BACKUP
     fi
 fi
@@ -178,12 +197,15 @@ done
 if [[] "$create_only" == "1" || "$dry_run" == "1" ]]; then
     exit
 fi
-echo ---- Backup Complete ----
 
-echo "---- Starting Onedrive upload ----"
+echo ---- Backup Complete [$(date)] ----
+
+echo ""
+echo "---- Starting Onedrive upload [$(date)] ----"
 [ "$verbose" == "1" ] && echo rclone sync -v --checkers 16 --transfers 16 --fast-list --copy-links $BACKUP_LOCATION $ONEDRIVE_LOCATION
 /usr/sbin/rclone sync -v --checkers 16 --transfers 16 --fast-list --copy-links $BACKUP_LOCATION $ONEDRIVE_LOCATION
-echo "---- Onedrive upload Complete ----"
+echo "---- Onedrive upload Complete [$(date)] ----"
+echo ""
 
 #/usr/sbin/rclone sync -v --transfers 16 --fast-list --progress --copy-links $BACKUP_LOCATION $ONEDRIVE_LOCATION
 #/usr/sbin/rclone sync -v /mnt/user/CommunityApplicationsAppdataBackup/ onedrive:unraid/backup
