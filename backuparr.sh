@@ -132,7 +132,7 @@ if [ ! $create_only == "1" ]; then
     if [ -d /boot ]; then
         [ ! -d $BACKUP_LOCATION/Flash ] && mkdir -p $BACKUP_LOCATION/Flash
         rsync -a -h --delete --progress /boot $BACKUP_LOCATION/Flash
-        mv $BACKUP_LOCATION/Flash/config/super.dat $BACKUP_LOCATION/Flash/config/super.dat.CA_BACKUP
+        mv $BACKUP_LOCATION/Flash/boot/config/super.dat $BACKUP_LOCATION/Flash/boot/config/super.dat.CA_BACKUP
     fi
 fi
 
