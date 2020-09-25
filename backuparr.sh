@@ -2,7 +2,7 @@
 
 BACKUP_LOCATION=/mnt/user/backup
 NUM_DAILY=7
-ONEDRIVE_LOCATION=onedrive:unraid/backup-docker
+ONEDRIVE_LOCATION=onedrive:unraid/backup
 DEFAULT_TIMEOUT=30
 #DRYRUN="--dry-run"
 DRYRUN=""
@@ -50,7 +50,11 @@ backup_docker() {
     [ ! -d $T_PATH ] && mkdir -p $T_PATH
     docker inspect $D_NAME >$T_PATH/$D_NAME-dockerconfig.json
 
-    local S_PATH=$(docker inspect -f '{{json .Mounts }}' $D_NAME | jq .[].Source | grep appdata/ | head -1 | cut -f 2 -d \" | tr -d '\n')
+    local S_PATH=$(docker inspect -f '{{json .Mounts }}' $D_NAME | jq .[].Source | grep appdata/ | grep -i $D_NAME | head -1 | cut -f 2 -d \" | tr -d '\n')
+    if [ "$S_PATH" == "" ]
+    then
+        S_PATH=$(docker inspect -f '{{json .Mounts }}' $D_NAME | jq .[].Source | grep appdata/ | head -1 | cut -f 2 -d \" | tr -d '\n')
+    fi
 
     [ ! -d $S_PATH ] && echo Could not find $S_PATH && return
     [ "$S_PATH" == "" ] && echo Could not find a source path for $D_NAME && return
@@ -141,8 +145,6 @@ for container in $containers; do
 done
 
 echo ---- Backup Complete ----
-
-exit
 
 echo "---- Starting Onedrive upload ----"
 /usr/sbin/rclone sync -v --transfers 16 --fast-list --copy-links $BACKUP_LOCATION $ONEDRIVE_LOCATION
