@@ -112,8 +112,8 @@ backup_docker() {
     fi
 
     if [ $RUNNING == "true" ] && [ ! $TIMEOUT == "0" ]; then
-        echo rsync -a --progress -h ${exclude_opts_pre[@]} $DRYRUN $S_PATH/ $D_PATH/
-        rsync -a --progress -h ${exclude_opts_pre[@]} $DRYRUN $S_PATH/ $D_PATH/
+        echo rsync -a --info=progress2 -h ${exclude_opts_pre[@]} $DRYRUN $S_PATH/ $D_PATH/
+        rsync -a --info=progress2 -h ${exclude_opts_pre[@]} $DRYRUN $S_PATH/ $D_PATH/
         echo Stopping $D_NAME with timeout: $TIMEOUT
         echo stopped docker $(docker stop -t $TIMEOUT $D_NAME)
     else
