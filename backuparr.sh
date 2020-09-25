@@ -162,9 +162,6 @@ backup_docker() {
 
 }
 
-backup_docker "plex"
-exit
-
 if [ ! "$create_only" == "1" ]; then
     if [ -d /boot ]; then
         [ ! -d $BACKUP_LOCATION/Flash ] && mkdir -p $BACKUP_LOCATION/Flash
