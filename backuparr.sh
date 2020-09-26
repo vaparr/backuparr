@@ -231,7 +231,7 @@ if [ "$verbose" == "1" ]; then
     /usr/sbin/rclone sync -v --checkers 16 --transfers 16 --fast-list --copy-links $BACKUP_LOCATION $ONEDRIVE_LOCATION
 else
     script_path=$(dirname $(realpath -s $0))
-    if [[ $script_path =~ \\boot\\repos.* ]]; then # one-line stats when running from user scripts
+    if [[ $script_path =~ \/boot\/repos.* ]]; then # one-line stats when running from user scripts
         echo rclone sync --progress --stats-one-line-date --checkers 16 --transfers 16 --fast-list --copy-links $BACKUP_LOCATION $ONEDRIVE_LOCATION
         /usr/sbin/rclone sync --progress --stats-one-line-date --checkers 16 --transfers 16 --fast-list --copy-links $BACKUP_LOCATION $ONEDRIVE_LOCATION
     else
