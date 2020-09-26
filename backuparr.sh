@@ -207,7 +207,7 @@ if [[ "$docker_name" == "" ]]; then
         backup_docker $container
     done
 else
-    container=$(sudo docker ps -a | awk '{if(NR>1) print $NF}' | grep -i $docker_name)
+    container=$(sudo docker ps -a | awk '{if(NR>1) print $NF}' | egrep -i ^$docker_name$)
     if [[ ! "$container" == "" ]]; then
         backup_docker $docker_name
     else
