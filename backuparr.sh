@@ -13,9 +13,10 @@ now=$(date +"%Y-%m-%d")
 create_only=0
 dry_run=0
 verbose=0
-no_onedrive=0
+skip_onedrive=0
+docker_name=""
 
-while getopts "h?cfdvn" opt; do
+while getopts "h?cfdvsn:" opt; do
     case "$opt" in
     h | \?)
         echo Showing Help
@@ -32,8 +33,11 @@ while getopts "h?cfdvn" opt; do
         verbose=1
         PROGRESS="--progress"
         ;;
+    s)
+        skip_onedrive=1
+        ;;
     n)
-        no_onedrive=1
+        docker_name=${OPTARG}
         ;;
     #f) 
         #output_file=$OPTARG
@@ -187,7 +191,7 @@ done
 # exit
 
 # flash drive backup
-if [ ! "$create_only" == "1" ]; then
+if [[ ! "$create_only" == "1" && "$docker_name" == "" ]]; then
     if [ -d /boot ]; then
         [ ! -d $BACKUP_LOCATION/Flash ] && mkdir -p $BACKUP_LOCATION/Flash
         [ "$verbose" == "1" ] && echo rsync -a -h --delete $PROGRESS $DRYRUN /boot $BACKUP_LOCATION/Flash
@@ -197,15 +201,25 @@ if [ ! "$create_only" == "1" ]; then
 fi
 
 # docker backup
-containers=$(sudo docker ps -a | awk '{if(NR>1) print $NF}')
-for container in $containers; do
-    backup_docker $container
-done
+if [[ "$docker_name" == "" ]]; then
+    containers=$(sudo docker ps -a | awk '{if(NR>1) print $NF}')
+    for container in $containers; do
+        backup_docker $container
+    done
+else
+    container=$(sudo docker ps -a | awk '{if(NR>1) print $NF}' | grep -i $docker_name)
+    if [[ ! "$container" == "" ]]; then
+        backup_docker $docker_name
+    else
+        echo Could not find $docker_name. Run docker ps command to check.
+        echo
+    fi
+fi
 
 echo "---- Backup Complete [$(date)] ----"
 echo ""
 
-if [[ "$create_only" == "1" || "$dry_run" == "1" || "$no_onedrive" == "1" ]]; then
+if [[ "$create_only" == "1" || "$dry_run" == "1" || "$skip_onedrive" == "1" ]]; then
     exit
 fi
 
@@ -217,7 +231,7 @@ if [ "$verbose" == "1" ]; then
     /usr/sbin/rclone sync -v --checkers 16 --transfers 16 --fast-list --copy-links $BACKUP_LOCATION $ONEDRIVE_LOCATION
 else
     script_path=$(dirname $(realpath -s $0))
-    if [[ $script_path =~ .*user\.scripts.* ]]; then # one-line stats when running from user scripts
+    if [[ $script_path =~ \\boot\\repos.* ]]; then # one-line stats when running from user scripts
         echo rclone sync --progress --stats-one-line-date --checkers 16 --transfers 16 --fast-list --copy-links $BACKUP_LOCATION $ONEDRIVE_LOCATION
         /usr/sbin/rclone sync --progress --stats-one-line-date --checkers 16 --transfers 16 --fast-list --copy-links $BACKUP_LOCATION $ONEDRIVE_LOCATION
     else
