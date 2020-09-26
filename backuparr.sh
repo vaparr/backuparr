@@ -9,6 +9,7 @@ PROGRESS="--info=progress2"
 EXCLUDE=(profile/lock fail2ban/filter.d www/Dashboard www/nextcloud home/.icons profile/cache2 cache2/entries log/ Log/ logs/ Logs/ '*.log' log.txt '*.log.*' Caches/ '*.pid' '*.sample' '*.lock')
 EXCLUDEPRE=('*.db' '*.xml' '*.dat' '*.dat.old' '*.db-*' '*.ini' '*.conf' '*.json' '*.ejs' BT_backup/ databases/ '*.sqlite*' '*.sqlite')
 
+script_path=$(dirname $(realpath -s $0))
 now=$(date +"%Y-%m-%d")
 create_only=0
 dry_run=0
@@ -80,24 +81,26 @@ backup_docker() {
 
     local BACKUPCONFIG=$(cat $T_PATH/$CONF_NAME 2>/dev/null | egrep -v ^\# | egrep -v ^$)
     if [ "$BACKUPCONFIG" == "" ]; then
-        echo \# docker timeout before force kill. Set to 0 to not stop the docker when backing it up >$T_PATH/$CONF_NAME
-        echo \#TIMEOUT=30 >>$T_PATH/$CONF_NAME
-        echo "" >>$T_PATH/$CONF_NAME
-        echo \#false will prevent the docker from being backed up. Default True >>$T_PATH/$CONF_NAME
-        echo \#BACKUP=\"false\" >>$T_PATH/$CONF_NAME
-        echo "" >>$T_PATH/$CONF_NAME
-        echo \#true will start the docker even if it wasnt running when the backup started >>$T_PATH/$CONF_NAME
-        echo \#FORCESTART=\"true\" >>$T_PATH/$CONF_NAME
-        echo "" >>$T_PATH/$CONF_NAME
-        echo \#Per Docker Excludes >>$T_PATH/$CONF_NAME
-        echo \#EXCLUDES=\(Plex?Media?Server/Cache Plex?Media?Server/Media Plex?Media?Server/Metadata data/metadata cache/ \'*.tmp\'\) >>$T_PATH/$CONF_NAME
+        if [ -f "$script_path/sample-configs/$CONF_NAME" ]
+        then
+            cp -f $script_path/sample-configs/$CONF_NAME $T_PATH/$CONF_NAME
+        else
+            cp -f $script_path/sample-configs/default-backup.conf $T_PATH/$CONF_NAME
+        fi
     else
         echo PHASE 0: Load Variables from $T_PATH/$CONF_NAME
         echo ""
         . $T_PATH/$CONF_NAME
     fi
 
-    if [ "$create_only" == 1 ]; then        
+    if [ "$create_only" == 1 ]; then
+        if [ -f "$script_path/sample-configs/$CONF_NAME" ]
+        then
+            cp -u $script_path/sample-configs/$CONF_NAME $T_PATH/$CONF_NAME
+        else
+            cp -u $script_path/sample-configs/default-backup.conf $T_PATH/$CONF_NAME
+        fi
+
         echo $T_PATH/$CONF_NAME was created.
         return
     fi
@@ -230,7 +233,6 @@ if [ "$verbose" == "1" ]; then
     echo rclone sync -v --checkers 16 --transfers 16 --fast-list --copy-links $BACKUP_LOCATION $ONEDRIVE_LOCATION
     /usr/sbin/rclone sync -v --checkers 16 --transfers 16 --fast-list --copy-links $BACKUP_LOCATION $ONEDRIVE_LOCATION
 else
-    script_path=$(dirname $(realpath -s $0))
     if [[ $script_path =~ \/boot\/repos.* ]]; then # one-line stats when running from user scripts
         echo rclone sync --checkers 16 --transfers 16 --fast-list --copy-links $BACKUP_LOCATION $ONEDRIVE_LOCATION
         echo rclone is working. Waiting...
