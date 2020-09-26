@@ -182,6 +182,10 @@ for item in "${EXCLUDEPRE[@]}"; do
     exclude_opts_pre+=(--exclude "$item")
 done
 
+# test
+# backup_docker "organizrv2"
+# exit
+
 # flash drive backup
 if [ ! "$create_only" == "1" ]; then
     if [ -d /boot ]; then
@@ -191,10 +195,6 @@ if [ ! "$create_only" == "1" ]; then
         [ "$dry_run" == "0" ] && mv $BACKUP_LOCATION/Flash/boot/config/super.dat $BACKUP_LOCATION/Flash/boot/config/super.dat.CA_BACKUP
     fi
 fi
-
-# test
-# backup_docker "organizrv2"
-# exit
 
 # docker backup
 containers=$(sudo docker ps -a | awk '{if(NR>1) print $NF}')
@@ -216,8 +216,14 @@ if [ "$verbose" == "1" ]; then
     echo rclone sync -v --checkers 16 --transfers 16 --fast-list --copy-links $BACKUP_LOCATION $ONEDRIVE_LOCATION
     /usr/sbin/rclone sync -v --checkers 16 --transfers 16 --fast-list --copy-links $BACKUP_LOCATION $ONEDRIVE_LOCATION
 else
-    echo rclone sync --progress --checkers 16 --transfers 16 --fast-list --copy-links $BACKUP_LOCATION $ONEDRIVE_LOCATION
-    /usr/sbin/rclone sync --progress --checkers 16 --transfers 16 --fast-list --copy-links $BACKUP_LOCATION $ONEDRIVE_LOCATION
+    script_path=$(dirname $(realpath -s $0))
+    if [[ $script_path =~ .*user\.scripts.* ]]; then # one-line stats when running from user scripts
+        echo rclone sync --progress --stats-one-line-date --checkers 16 --transfers 16 --fast-list --copy-links $BACKUP_LOCATION $ONEDRIVE_LOCATION
+        /usr/sbin/rclone sync --progress --stats-one-line-date --checkers 16 --transfers 16 --fast-list --copy-links $BACKUP_LOCATION $ONEDRIVE_LOCATION
+    else
+        echo rclone sync --progress --checkers 16 --transfers 16 --fast-list --copy-links $BACKUP_LOCATION $ONEDRIVE_LOCATION
+        /usr/sbin/rclone sync --progress --checkers 16 --transfers 16 --fast-list --copy-links $BACKUP_LOCATION $ONEDRIVE_LOCATION
+    fi
 fi
 
 echo ""
