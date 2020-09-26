@@ -49,6 +49,7 @@ backup_docker() {
     local BACKUP="true"
     local FORCESTART="false"
     local EXCLUDES=""
+    local CONF_NAME=$D_NAME-backup.conf
 
     [ "$1" == "" ] && echo Docker is a required param && return
 
@@ -69,31 +70,31 @@ backup_docker() {
 
     [ ! -d $D_PATH ] && mkdir -p $D_PATH
 
-    if [ ! -f $T_PATH/backup.config ]; then
-        touch $T_PATH/backup.config
+    if [ ! -f $T_PATH/$CONF_NAME ]; then
+        touch $T_PATH/$CONF_NAME
     fi
 
-    local BACKUPCONFIG=$(cat $T_PATH/backup.config 2>/dev/null | egrep -v ^\# | egrep -v ^$)
+    local BACKUPCONFIG=$(cat $T_PATH/$CONF_NAME 2>/dev/null | egrep -v ^\# | egrep -v ^$)
     if [ "$BACKUPCONFIG" == "" ]; then
-        echo \# docker timeout before force kill. Set to 0 to not stop the docker when backing it up >$T_PATH/backup.config
-        echo \#TIMEOUT=30 >>$T_PATH/backup.config
-        echo "" >>$T_PATH/backup.config
-        echo \#false will prevent the docker from being backed up. Default True >>$T_PATH/backup.config
-        echo \#BACKUP=\"false\" >>$T_PATH/backup.config
-        echo "" >>$T_PATH/backup.config
-        echo \#true will start the docker even if it wasnt running when the backup started >>$T_PATH/backup.config
-        echo \#FORCESTART=\"true\" >>$T_PATH/backup.config
-        echo "" >>$T_PATH/backup.config
-        echo \#Per Docker Excludes >>$T_PATH/backup.config
-        echo \#EXCLUDES=\(Plex?Media?Server/Cache Plex?Media?Server/Media Plex?Media?Server/Metadata data/metadata cache/ \'*.tmp\'\) >>$T_PATH/backup.config
+        echo \# docker timeout before force kill. Set to 0 to not stop the docker when backing it up >$T_PATH/$CONF_NAME
+        echo \#TIMEOUT=30 >>$T_PATH/$CONF_NAME
+        echo "" >>$T_PATH/$CONF_NAME
+        echo \#false will prevent the docker from being backed up. Default True >>$T_PATH/$CONF_NAME
+        echo \#BACKUP=\"false\" >>$T_PATH/$CONF_NAME
+        echo "" >>$T_PATH/$CONF_NAME
+        echo \#true will start the docker even if it wasnt running when the backup started >>$T_PATH/$CONF_NAME
+        echo \#FORCESTART=\"true\" >>$T_PATH/$CONF_NAME
+        echo "" >>$T_PATH/$CONF_NAME
+        echo \#Per Docker Excludes >>$T_PATH/$CONF_NAME
+        echo \#EXCLUDES=\(Plex?Media?Server/Cache Plex?Media?Server/Media Plex?Media?Server/Metadata data/metadata cache/ \'*.tmp\'\) >>$T_PATH/$CONF_NAME
     else
-        echo PHASE 0: Load Variables from $T_PATH/backup.config
+        echo PHASE 0: Load Variables from $T_PATH/$CONF_NAME
         echo ""
-        . $T_PATH/backup.config
+        . $T_PATH/$CONF_NAME
     fi
 
     if [ "$create_only" == 1 ]; then        
-        echo $T_PATH/backup.config was created.
+        echo $T_PATH/$CONF_NAME was created.
         return
     fi
 
@@ -215,6 +216,7 @@ if [ "$verbose" == "1" ]; then
     echo rclone sync -v --checkers 16 --transfers 16 --fast-list --copy-links $BACKUP_LOCATION $ONEDRIVE_LOCATION
     /usr/sbin/rclone sync -v --checkers 16 --transfers 16 --fast-list --copy-links $BACKUP_LOCATION $ONEDRIVE_LOCATION
 else
+    echo rclone sync --progress --checkers 16 --transfers 16 --fast-list --copy-links $BACKUP_LOCATION $ONEDRIVE_LOCATION
     /usr/sbin/rclone sync --progress --checkers 16 --transfers 16 --fast-list --copy-links $BACKUP_LOCATION $ONEDRIVE_LOCATION
 fi
 
