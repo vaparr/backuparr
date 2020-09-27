@@ -55,7 +55,7 @@ backup_docker() {
     local FORCESTART="false"
     local EXCLUDES=""
     local CONF_NAME=$D_NAME-backup.conf
-
+    local ARCHIVE_DAYS=$NUM_DAILY
     [ "$1" == "" ] && echo Docker is a required param && return
 
     echo =================================================================
@@ -132,15 +132,15 @@ backup_docker() {
     [ ! "$EXCLUDES" == "" ] && printf "Excludes: \t (${EXCLUDES[*]})\n"
     echo ""
 
-    [ ! -d $A_PATH ] && [ ! "$NUM_DAILY" == "0" ] && mkdir -p $A_PATH
+    [ ! -d $A_PATH ] && [ ! "$ARCHIVE_DAYS" == "0" ] && mkdir -p $A_PATH
     
     echo PHASE 1: Archive $D_PATH to $A_FILE
-    if [ -d $A_PATH ] && [ ! -f $A_FILE ] && [ -d $D_PATH ] && [ ! "$NUM_DAILY" == "0" ] && [ "$dry_run" == "0" ]; then        
+    if [ -d $A_PATH ] && [ ! -f $A_FILE ] && [ -d $D_PATH ] && [ ! "$ARCHIVE_DAYS" == "0" ] && [ "$dry_run" == "0" ]; then        
         [ "$verbose" == "1" ] && echo PHASE 1: tar -czf $A_FILE -C $D_PATH .
         tar -czf $A_FILE -C $D_PATH .
     else
         [ -f $A_FILE ] && echo PHASE 1: Skipped. Archive exists for $now.
-        [ ! -f $A_FILE ] && echo PHASE 1: Skipped. NUM_DAILY [$NUM_DAILY], DRY_RUN [$dry_run]
+        [ ! -f $A_FILE ] && echo PHASE 1: Skipped. NUM_DAILY [$ARCHIVE_DAYS], DRY_RUN [$dry_run]
     fi
     
     echo PHASE 2: Run rsync to copy files BEFORE docker stop
@@ -165,7 +165,7 @@ backup_docker() {
         echo PHASE 4: Skipped. FORCESTART [$FORCESTART], RUNNING [$RUNNING], TIMEOUT [$TIMEOUT]
     fi
 
-    [ "$dry_run" == "0" ] && [ -d $DAILY_LOCATION ] && [ ! "$NUM_DAILY" == "0" ] && find $A_PATH -mtime +${NUM_DAILY} -name '*.tgz' -delete
+    [ "$dry_run" == "0" ] && [ -d $DAILY_LOCATION ] && [ ! "$ARCHIVE_DAYS" == "0" ] && find $A_PATH -mtime +${ARCHIVE_DAYS} -name '*.tgz' -delete
 
     echo ""
     echo End Time: $(date)
