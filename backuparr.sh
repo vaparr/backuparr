@@ -6,7 +6,7 @@ ONEDRIVE_LOCATION=onedrive:unraid/backup
 DEFAULT_TIMEOUT=30
 DRYRUN=""
 PROGRESS="--info=progress2"
-EXCLUDE=(profile/lock log/ Log/ logs/ Logs/ '*.log' log.txt '*.log.*' Caches/ '*.pid' '*.sample' '*.lock' /lock)
+EXCLUDE=(profile/lock log/ Log/ logs/ Logs/ '*.log' log.txt '*.log.*' '*.pid' '*.sample' '*.lock' /lock)
 EXCLUDEPRE=('*.db' '*.xml' '*.dat' '*.dat.old' '*.db-*' '*.ini' '*.conf' '*.json' '*.ejs' BT_backup/ databases/ '*.sqlite*' '*.sqlite')
 
 script_path=$(dirname $(realpath -s $0))
