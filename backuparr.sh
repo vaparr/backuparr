@@ -273,12 +273,12 @@ fi
 
 # docker backup
 if [[ "$docker_name" == "" ]]; then
-    containers=$(sudo docker ps -a | awk '{if(NR>1) print $NF}')
+    containers=$(docker ps -a | awk '{if(NR>1) print $NF}' | sort -f)
     for container in $containers; do
         backup_docker $container
     done
 else
-    container=$(sudo docker ps -a | awk '{if(NR>1) print $NF}' | egrep -i ^$docker_name$)
+    container=$(docker ps -a | awk '{if(NR>1) print $NF}' | egrep -i ^$docker_name$)
     if [[ ! "$container" == "" ]]; then
         backup_docker $docker_name
     else
