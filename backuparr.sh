@@ -195,6 +195,12 @@ done
 
 # flash drive backup
 if [[ ! "$create_only" == "1" && "$docker_name" == "" ]]; then
+    backup_file=`/usr/local/emhttp/webGui/scripts/flash_backup`
+    if [ -f /$backup_file ]; then
+       mkdir -p $BACKUP_LOCATION/Flash/Archive
+       mv /$backup_file $BACKUP_LOCATION/Flash/Archive
+       find $BACKUP_LOCATION/Flash/Archive -mtime +${NUM_DAILY} -name '*.zip' -delete
+    fi
     if [ -d /boot ]; then
         [ ! -d $BACKUP_LOCATION/Flash ] && mkdir -p $BACKUP_LOCATION/Flash
         [ "$verbose" == "1" ] && echo rsync -a -h --delete $PROGRESS $DRYRUN /boot $BACKUP_LOCATION/Flash
