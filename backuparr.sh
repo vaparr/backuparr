@@ -1,5 +1,6 @@
+#!/bin/bash
 #set -x
-
+SECONDS=0
 BACKUP_LOCATION=/mnt/user/backup
 NUM_DAILY=3
 ONEDRIVE_LOCATION=onedrive:unraid/backup
@@ -16,11 +17,18 @@ dry_run=0
 verbose=0
 skip_onedrive=0
 docker_name=""
+STOPPED_DOCKER=""
+
 
 while getopts "h?cfdvsn:" opt; do
     case "$opt" in
     h | \?)
-        echo Showing Help
+        echo Options:
+	echo "-d : Dry Run"
+	echo "-v : Verbose"
+	echo "-s : Skip OneDrive Upload"
+	echo "-c : Create Backup.config files only"
+	echo "-n [docker] : Only backup this single docker"
         exit 0
         ;;
     c)
@@ -46,6 +54,52 @@ while getopts "h?cfdvsn:" opt; do
     esac
 done
 
+trap 'ExitFunc' exit
+SUCCESS="false"
+function ExitFunc(){
+    if [[ ! "$SUCCESS" == "true" ]]; then
+       NotifyError "[Backuparr exited]" "Script exited abnormally after $SECONDS seconds."
+    else
+       NotifyInfo "[Backuparr exited]" "Script exited normally after $SECONDS seconds."
+    fi
+
+    if [[ ! "$STOPPED_DOCKER == "" ]]; then
+       docker start $STOPPED_DOCKER
+    fi
+
+}
+
+function NotifyInfo() {
+    if [[ $script_path =~ \/boot\/repos.* ]]; then # one-line stats when running from user scripts
+         /usr/local/emhttp/webGui/scripts/notify -e "$1" -d "$2" -i "normal" 
+    fi
+    echo $1 - $2
+}
+
+function NotifyError() {
+    if [[ $script_path =~ \/boot\/repos.* ]]; then # one-line stats when running from user scripts
+         /usr/local/emhttp/webGui/scripts/notify -e "$1" -d "$2" -i "alert" 
+    fi
+    echo [ERROR] $1 - $2
+}
+
+function LogInfo() {
+    echo "$@"
+}
+
+function LogVerbose() {
+    [ "$verbose" == "1" ] && echo "$@"
+}
+
+function LogWarning() {
+    echo "[WARNING] $@"
+}
+
+function LogError() {
+   echo "[ERROR] $@"
+   NotifyError "Backuparr Error" "$@"
+}
+
 backup_docker() {
     local TIMEOUT=$DEFAULT_TIMEOUT
     local D_NAME=$1
@@ -56,11 +110,11 @@ backup_docker() {
     local EXCLUDES=""
     local CONF_NAME=$D_NAME-backup.conf
     local ARCHIVE_DAYS=$NUM_DAILY
-    [ "$1" == "" ] && echo Docker is a required param && return
+    [ "$1" == "" ] && LogInfo Docker is a required param && return
 
-    echo =================================================================
-    echo Docker: $D_NAME [Start Time: $(date)]
-    echo =================================================================
+    LogInfo =================================================================
+    LogInfo Docker: $D_NAME [Start Time: $(date)]
+    LogInfo =================================================================
 
     [ ! -d $T_PATH ] && mkdir -p $T_PATH
     [[ "$create_only" == "1" || "$dry_run" == "1" ]] && docker inspect $D_NAME >$T_PATH/$D_NAME-dockerconfig.json
@@ -70,8 +124,8 @@ backup_docker() {
         S_PATH=$(docker inspect -f '{{json .Mounts }}' $D_NAME | jq .[].Source | grep appdata/ | head -1 | cut -f 2 -d \" | tr -d '\n')
     fi
 
-    [ ! -d $S_PATH ] && echo "Could not find $S_PATH" && echo && return
-    [ "$S_PATH" == "" ] && echo "Could not find a source path for $D_NAME" && echo && return
+    [ ! -d $S_PATH ] && LogWarning "Could not find $S_PATH" && echo && return
+    [ "$S_PATH" == "" ] && LogWarning "Could not find a source path for $D_NAME" && echo && return
 
     [ ! -d $D_PATH ] && mkdir -p $D_PATH
 
@@ -88,8 +142,8 @@ backup_docker() {
             cp -f $script_path/sample-configs/default-backup.conf $T_PATH/$CONF_NAME
         fi
     else
-        echo PHASE 0: Load Variables from $T_PATH/$CONF_NAME
-        echo ""
+        LogInfo PHASE 0: Load Variables from $T_PATH/$CONF_NAME
+        LogInfo ""
         . $T_PATH/$CONF_NAME
     fi
 
@@ -101,7 +155,7 @@ backup_docker() {
             cp -u $script_path/sample-configs/default-backup.conf $T_PATH/$CONF_NAME
         fi
 
-        echo $T_PATH/$CONF_NAME was created.
+        LogInfo $T_PATH/$CONF_NAME was created.
         return
     fi
 
@@ -117,7 +171,7 @@ backup_docker() {
         done
     fi
 
-    [ ! "$BACKUP" == "true" ] && echo PHASE 0: Skipping Docker $D_NAME && return
+    [ ! "$BACKUP" == "true" ] && LogInfo PHASE 0: Skipping Docker $D_NAME && return
 
     local A_PATH=$T_PATH/Archive
     local A_FILE=$A_PATH/$D_NAME-${now}.tgz
@@ -134,35 +188,41 @@ backup_docker() {
 
     [ ! -d $A_PATH ] && [ ! "$ARCHIVE_DAYS" == "0" ] && mkdir -p $A_PATH
     
-    echo PHASE 1: Archive $D_PATH to $A_FILE
+    LogInfo PHASE 1: Archive $D_PATH to $A_FILE
     if [ -d $A_PATH ] && [ ! -f $A_FILE ] && [ -d $D_PATH ] && [ ! "$ARCHIVE_DAYS" == "0" ] && [ "$dry_run" == "0" ]; then        
-        [ "$verbose" == "1" ] && echo PHASE 1: tar -czf $A_FILE -C $D_PATH .
+        LogVerbose PHASE 1: tar -czf $A_FILE -C $D_PATH .
         tar -czf $A_FILE -C $D_PATH .
     else
-        [ -f $A_FILE ] && echo PHASE 1: Skipped. Archive exists for $now.
-        [ ! -f $A_FILE ] && echo PHASE 1: Skipped. NUM_DAILY [$ARCHIVE_DAYS], DRY_RUN [$dry_run]
+        [ -f $A_FILE ] && LogInfo PHASE 1: Skipped. Archive exists for $now.
+        [ ! -f $A_FILE ] && LogInfo PHASE 1: Skipped. NUM_DAILY [$ARCHIVE_DAYS], DRY_RUN [$dry_run]
     fi
     
-    echo PHASE 2: Run rsync to copy files BEFORE docker stop
+    LogInfo PHASE 2: Run rsync to copy files BEFORE docker stop
     if [ "$RUNNING" == "true" ] && [ ! "$TIMEOUT" == "0" ]; then        
-        [ "$verbose" == "1" ] && echo PHASE 2: rsync -a $PROGRESS -h ${pre_excludes[@]} $DRYRUN $S_PATH/ $D_PATH/
+        LogVerbose PHASE 2: rsync -a $PROGRESS -h ${pre_excludes[@]} $DRYRUN $S_PATH/ $D_PATH/
         rsync -a $PROGRESS -h ${pre_excludes[@]} $DRYRUN $S_PATH/ $D_PATH/
-        echo PHASE 2: STOP $D_NAME with timeout: $TIMEOUT
-        [ "$dry_run" == "0" ] && echo PHASE 2: STOPPED docker $(docker stop -t $TIMEOUT $D_NAME)
+        LogInfo PHASE 2: STOP $D_NAME with timeout: $TIMEOUT
+        if [ "$dry_run" == "0" ]; then
+            STOPPED_DOCKER=$D_NAME
+            LogInfo PHASE 2: STOPPED docker $(docker stop -t $TIMEOUT $D_NAME)
+        fi
     else
-        echo PHASE 2: Skipped because either docker state [$RUNNING] is not running or Timeout [$TIMEOUT] specified as 0 to prevent docker stop.
+        LogInfo PHASE 2: Skipped because either docker state [$RUNNING] is not running or Timeout [$TIMEOUT] specified as 0 to prevent docker stop.
     fi
     
-    echo PHASE 3: Run rsync to copy files AFTER docker stop
-    [ "$verbose" == "1" ] && echo PHASE 3: rsync -a $PROGRESS -h ${full_excludes[@]} --delete $DRYRUN $S_PATH/ $D_PATH/
+    LogInfo PHASE 3: Run rsync to copy files AFTER docker stop
+    LogVerbose PHASE 3: rsync -a $PROGRESS -h ${full_excludes[@]} --delete $DRYRUN $S_PATH/ $D_PATH/
     rsync -a $PROGRESS -h ${full_excludes[@]} --delete $DRYRUN $S_PATH/ $D_PATH/
     
-    echo "PHASE 4: Start docker if previously running"
+    LogInfo "PHASE 4: Start docker if previously running"
     if [[ ! "$FORCESTART" == "false" ]] || [[ "$RUNNING" == "true" && ! "$TIMEOUT" == "0" ]]; then
-        echo PHASE 4: START $D_NAME
-        [ "$dry_run" == "0" ] && echo PHASE 4: STARTED docker $(docker start $D_NAME)
+        LogInfo PHASE 4: START $D_NAME
+        if [ "$dry_run" == "0" ];then
+           LogInfo PHASE 4: STARTED docker $(docker start $D_NAME)
+           STOPPED_DOCKER=""
+        fi
     else
-        echo PHASE 4: Skipped. FORCESTART [$FORCESTART], RUNNING [$RUNNING], TIMEOUT [$TIMEOUT]
+        LogInfo PHASE 4: Skipped. FORCESTART [$FORCESTART], RUNNING [$RUNNING], TIMEOUT [$TIMEOUT]
     fi
 
     [ "$dry_run" == "0" ] && [ -d $DAILY_LOCATION ] && [ ! "$ARCHIVE_DAYS" == "0" ] && find $A_PATH -mtime +${ARCHIVE_DAYS} -name '*.tgz' -delete
@@ -195,6 +255,7 @@ done
 
 # flash drive backup
 if [[ ! "$create_only" == "1" && "$docker_name" == "" ]]; then
+    LogInfo Starting Flash Backup...
     backup_file=`/usr/local/emhttp/webGui/scripts/flash_backup`
     if [ -f /$backup_file ]; then
        mkdir -p $BACKUP_LOCATION/Flash/Archive
@@ -203,10 +264,11 @@ if [[ ! "$create_only" == "1" && "$docker_name" == "" ]]; then
     fi
     if [ -d /boot ]; then
         [ ! -d $BACKUP_LOCATION/Flash ] && mkdir -p $BACKUP_LOCATION/Flash
-        [ "$verbose" == "1" ] && echo rsync -a -h --delete $PROGRESS $DRYRUN /boot $BACKUP_LOCATION/Flash
+        LogVerbose rsync -a -h --delete $PROGRESS $DRYRUN /boot $BACKUP_LOCATION/Flash
         rsync -a -h --delete $PROGRESS $DRYRUN /boot $BACKUP_LOCATION/Flash
         [ "$dry_run" == "0" ] && mv $BACKUP_LOCATION/Flash/boot/config/super.dat $BACKUP_LOCATION/Flash/boot/config/super.dat.CA_BACKUP
     fi
+    LogInfo Flash Backup completed.
 fi
 
 # docker backup
@@ -220,7 +282,7 @@ else
     if [[ ! "$container" == "" ]]; then
         backup_docker $docker_name
     else
-        echo Could not find $docker_name. Run docker ps command to check.
+        LogWarning Could not find $docker_name. Run docker ps command to check.
         echo
     fi
 fi
@@ -229,26 +291,23 @@ echo "---- Backup Complete [$(date)] ----"
 echo ""
 
 if [[ "$create_only" == "1" || "$dry_run" == "1" || "$skip_onedrive" == "1" ]]; then
+    SUCCESS="true"
     exit
 fi
 
 echo "---- Starting Onedrive upload [$(date)] ----"
 echo ""
 
-if [ "$verbose" == "1" ]; then
-    echo rclone sync -v --checkers 16 --transfers 16 --fast-list --copy-links $BACKUP_LOCATION $ONEDRIVE_LOCATION
-    /usr/sbin/rclone sync -v --checkers 16 --transfers 16 --fast-list --copy-links $BACKUP_LOCATION $ONEDRIVE_LOCATION
+if [[ $script_path =~ \/boot\/repos.* ]]; then # one-line stats when running from user scripts
+    LogInfo rclone sync --checkers 16 --transfers 16 --fast-list --copy-links $BACKUP_LOCATION $ONEDRIVE_LOCATION
+    LogInfo rclone is working. Waiting...
+    /usr/sbin/rclone sync --checkers 16 --transfers 16 --fast-list --copy-links $BACKUP_LOCATION $ONEDRIVE_LOCATION
 else
-    if [[ $script_path =~ \/boot\/repos.* ]]; then # one-line stats when running from user scripts
-        echo rclone sync --checkers 16 --transfers 16 --fast-list --copy-links $BACKUP_LOCATION $ONEDRIVE_LOCATION
-        echo rclone is working. Waiting...
-        /usr/sbin/rclone sync --checkers 16 --transfers 16 --fast-list --copy-links $BACKUP_LOCATION $ONEDRIVE_LOCATION
-    else
-        echo rclone sync --progress --checkers 16 --transfers 16 --fast-list --copy-links $BACKUP_LOCATION $ONEDRIVE_LOCATION
-        /usr/sbin/rclone sync --progress --checkers 16 --transfers 16 --fast-list --copy-links $BACKUP_LOCATION $ONEDRIVE_LOCATION
-    fi
+    LogVerbose rclone sync --progress --checkers 16 --transfers 16 --fast-list --copy-links $BACKUP_LOCATION $ONEDRIVE_LOCATION
+    /usr/sbin/rclone sync --progress --checkers 16 --transfers 16 --fast-list --copy-links $BACKUP_LOCATION $ONEDRIVE_LOCATION
 fi
 
+SUCCESS="true"
 echo ""
 echo "---- Onedrive upload Complete [$(date)] ----"
 echo ""
