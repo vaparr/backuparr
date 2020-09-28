@@ -63,7 +63,7 @@ function ExitFunc(){
        NotifyInfo "[Backuparr exited]" "Script exited normally after $SECONDS seconds."
     fi
 
-    if [[ ! "$STOPPED_DOCKER == "" ]]; then
+    if [[ ! "$STOPPED_DOCKER" == "" ]]; then
        docker start $STOPPED_DOCKER
     fi
 
