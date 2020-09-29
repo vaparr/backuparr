@@ -196,7 +196,13 @@ function archive_docker() {
     LogInfo PHASE 1: Archive $D_PATH to $A_FILE
     if [ -d $A_PATH ] && [ ! -f $A_FILE ] && [ -d $D_PATH ]; then
         LogVerbose PHASE 1: tar -czf $A_FILE -C $D_PATH .
-        [[ "$dry_run" == "0" ]] && tar -czf $A_FILE -C $D_PATH .
+        if [[ "$dry_run" == "0" ]];then
+           tar -czf $A_FILE -C $D_PATH .
+           if [[ $? -ne 0 ]]; then
+              LogError "tar failed"
+           fi
+        fi
+
     else
         [ -f $A_FILE ] && LogInfo PHASE 1: Skipped. Archive exists for $now.
         [ ! -f $A_FILE ] && LogInfo PHASE 1: Skipped. NUM_DAILY [$ARCHIVE_DAYS]
@@ -265,6 +271,9 @@ function backup_docker() {
     if [ "$RUNNING" == "true" ] && [ ! "$TIMEOUT" == "0" ]; then        
         LogVerbose PHASE 2: rsync -a $PROGRESS -h ${pre_excludes[@]} $DRYRUN $S_PATH/ $D_PATH/
         rsync -a $PROGRESS -h ${pre_excludes[@]} $DRYRUN $S_PATH/ $D_PATH/
+        if [[ $? -ne 0 ]]; then
+           LogWarning "Pre Rsync Failed"
+        fi
         stop_docker $D_NAME $TIMEOUT
     else
         LogInfo PHASE 2: Skipped Docker Stop because either docker state:$RUNNING is not running or Timeout [$TIMEOUT] is 0.
@@ -273,6 +282,9 @@ function backup_docker() {
     LogInfo PHASE 3: Run rsync to copy files AFTER docker stop
     LogVerbose PHASE 3: rsync -a $PROGRESS -h ${full_excludes[@]} --delete --delete-excluded $DRYRUN $S_PATH/ $D_PATH/
     rsync -a $PROGRESS -h ${full_excludes[@]} --delete --delete-excluded $DRYRUN $S_PATH/ $D_PATH/
+    if [[ $? -ne 0 ]]; then
+       LogError "Full Rsync Failed"
+    fi
     
     LogInfo "PHASE 4: Start docker if previously running"
 
@@ -321,6 +333,10 @@ if [[ ! "$create_only" == "1" && "$docker_name" == "" ]]; then
        LogInfo "Skipping /usr/local/emhttp/webGui/scripts/flash_backup in dry run"
     else
         backup_file=`/usr/local/emhttp/webGui/scripts/flash_backup`
+        if [[ $? -ne 0 ]]; then
+            LogError "flash_backup failed"
+        fi
+
         if [ -f /$backup_file ]; then
            mkdir -p $BACKUP_LOCATION/Flash/Archive
            mv /$backup_file $BACKUP_LOCATION/Flash/Archive
@@ -372,6 +388,9 @@ if [[ $script_path =~ \/boot\/repos.* ]]; then # one-line stats when running fro
 else
     LogVerbose $RCLONE --progress $BACKUP_LOCATION $ONEDRIVE_LOCATION
     $RCLONE --progress $BACKUP_LOCATION $ONEDRIVE_LOCATION
+fi
+if [[ $? -ne 0 ]]; then
+    LogError "rclone failed"
 fi
 
 
