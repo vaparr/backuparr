@@ -100,38 +100,61 @@ function LogError() {
    NotifyError "Backuparr Error" "$@"
 }
 
-backup_docker() {
-    local TIMEOUT=$DEFAULT_TIMEOUT
-    local D_NAME=$1
-    local T_PATH=$BACKUP_LOCATION/Docker/$D_NAME
-    local D_PATH=$T_PATH/Live
-    local BACKUP="true"
-    local FORCESTART="false"
-    local EXCLUDES=""
-    local CONF_NAME=$D_NAME-backup.conf
-    local ARCHIVE_DAYS=$NUM_DAILY
-    [ "$1" == "" ] && LogInfo Docker is a required param && return
+function stop_docker(){
+    local stop_seconds=$SECONDS
+    LogInfo PHASE 2: STOPPING $1 with timeout: $2
+    local RUNNING=$(docker container inspect -f '{{.State.Running}}' $1)
 
-    LogInfo =================================================================
-    LogInfo Docker: $D_NAME [Start Time: $(date)]
-    LogInfo =================================================================
+    if [[ "$RUNNING" == "false" ]];
+    then
+        LogInfo PHASE 2: Docker is already stopped!
+        return
+    fi
+
+    if [ "$dry_run" == "0" ]; then
+        STOPPED_DOCKER=$1
+        LogInfo PHASE 2: STOPPED docker $(docker stop -t $2 $1) in $(( SECONDS-$stop_seconds )) Seconds
+    fi
+    RUNNING=$(docker container inspect -f '{{.State.Running}}' $1)
+
+    if [[ "$RUNNING" == "false" ]];
+    then
+        LogVerbose PHASE 2: Docker Stopped Successfully
+    else
+        LogWarning PHASE 2: Docker not stopped.
+        docker stop -t 600 $1
+    fi
+}
+
+function start_docker(){
+    local start_seconds=$SECONDS
+    LogInfo PHASE 4: STARTING $1
+    local RUNNING=$(docker container inspect -f '{{.State.Running}}' $1)
+    if [[ "$RUNNING" == "true" ]];
+    then
+        LogInfo PHASE 4: Docker is already started!
+        return
+    fi
+    if [ "$dry_run" == "0" ];then
+       LogInfo PHASE 4: STARTED docker $(docker start $1) in $(( SECONDS-$start_seconds )) Seconds
+       STOPPED_DOCKER=""
+    fi
+    RUNNING=$(docker container inspect -f '{{.State.Running}}' $1)
+    if [[ "$RUNNING" == "true" ]];
+    then
+        LogVerbose PHASE 4: Docker Started Successfully
+    else
+        LogWarning PHASE 4: Docker not started.
+        docker start $1
+    fi
+
+}
+
+function create_config(){
+
+    [[ "$dry_run" == "1" ]] && LogInfo "Skipping config create in DryRun" && return
 
     [ ! -d $T_PATH ] && mkdir -p $T_PATH
-    [[ "$create_only" == "1" || "$dry_run" == "1" ]] && docker inspect $D_NAME >$T_PATH/$D_NAME-dockerconfig.json
-
-    local S_PATH=$(docker inspect -f '{{json .Mounts }}' $D_NAME | jq .[].Source | grep appdata/ | grep -i $D_NAME | head -1 | cut -f 2 -d \" | tr -d '\n')
-    if [ "$S_PATH" == "" ]; then
-        S_PATH=$(docker inspect -f '{{json .Mounts }}' $D_NAME | jq .[].Source | grep appdata/ | head -1 | cut -f 2 -d \" | tr -d '\n')
-    fi
-
-    [ ! -d $S_PATH ] && LogWarning "Could not find $S_PATH" && echo && return
-    [ "$S_PATH" == "" ] && LogWarning "Could not find a source path for $D_NAME" && echo && return
-
-    [ ! -d $D_PATH ] && mkdir -p $D_PATH
-
-    if [ ! -f $T_PATH/$CONF_NAME ]; then
-        touch $T_PATH/$CONF_NAME
-    fi
 
     local BACKUPCONFIG=$(cat $T_PATH/$CONF_NAME 2>/dev/null | egrep -v ^\# | egrep -v ^$)
     if [ "$BACKUPCONFIG" == "" ]; then
@@ -158,6 +181,54 @@ backup_docker() {
         LogInfo $T_PATH/$CONF_NAME was created.
         return
     fi
+}
+
+
+function archive_docker() {
+    [ ! -d $A_PATH ] && [ ! "$ARCHIVE_DAYS" == "0" ] && mkdir -p $A_PATH
+
+    LogInfo PHASE 1: Archive $D_PATH to $A_FILE
+    if [ -d $A_PATH ] && [ ! -f $A_FILE ] && [ -d $D_PATH ] && [ ! "$ARCHIVE_DAYS" == "0" ]; then
+        LogVerbose PHASE 1: tar -czf $A_FILE -C $D_PATH .
+        [[ "$dry_run" == "0" ]] && tar -czf $A_FILE -C $D_PATH .
+    else
+        [ -f $A_FILE ] && LogInfo PHASE 1: Skipped. Archive exists for $now.
+        [ ! -f $A_FILE ] && LogInfo PHASE 1: Skipped. NUM_DAILY [$ARCHIVE_DAYS]
+    fi
+}
+
+function backup_docker() {
+    local START_TIME=$SECONDS
+    local TIMEOUT=$DEFAULT_TIMEOUT
+    local D_NAME=$1
+    local T_PATH=$BACKUP_LOCATION/Docker/$D_NAME
+    local D_PATH=$T_PATH/Live
+    local BACKUP="true"
+    local FORCESTART="false"
+    local EXCLUDES=""
+    local CONF_NAME=$D_NAME-backup.conf
+    local ARCHIVE_DAYS=$NUM_DAILY
+    [ "$1" == "" ] && LogInfo Docker is a required param && return
+
+    LogInfo =================================================================
+    LogInfo Docker: $D_NAME [Start Time: $(date)]
+    LogInfo =================================================================
+
+    create_config
+
+    [[ "$create_only" == "1" ]] && return
+
+    docker inspect $D_NAME >$T_PATH/$D_NAME-dockerconfig.json
+
+    local S_PATH=$(docker inspect -f '{{json .Mounts }}' $D_NAME | jq .[].Source | grep appdata/ | grep -i $D_NAME | head -1 | cut -f 2 -d \" | tr -d '\n')
+    if [ "$S_PATH" == "" ]; then
+        S_PATH=$(docker inspect -f '{{json .Mounts }}' $D_NAME | jq .[].Source | grep appdata/ | head -1 | cut -f 2 -d \" | tr -d '\n')
+    fi
+
+    [ ! -d $S_PATH ] && LogWarning "Could not find $S_PATH" && echo && return
+    [ "$S_PATH" == "" ] && LogWarning "Could not find a source path for $D_NAME" && echo && return
+
+    [ ! -d $D_PATH ] && mkdir -p $D_PATH
 
     local pre_excludes=${exclude_opts_pre[@]}
     local full_excludes=${exclude_opts[@]}    
@@ -186,26 +257,13 @@ backup_docker() {
     [ ! "$EXCLUDES" == "" ] && printf "Excludes: \t (${EXCLUDES[*]})\n"
     echo ""
 
-    [ ! -d $A_PATH ] && [ ! "$ARCHIVE_DAYS" == "0" ] && mkdir -p $A_PATH
-    
-    LogInfo PHASE 1: Archive $D_PATH to $A_FILE
-    if [ -d $A_PATH ] && [ ! -f $A_FILE ] && [ -d $D_PATH ] && [ ! "$ARCHIVE_DAYS" == "0" ] && [ "$dry_run" == "0" ]; then        
-        LogVerbose PHASE 1: tar -czf $A_FILE -C $D_PATH .
-        tar -czf $A_FILE -C $D_PATH .
-    else
-        [ -f $A_FILE ] && LogInfo PHASE 1: Skipped. Archive exists for $now.
-        [ ! -f $A_FILE ] && LogInfo PHASE 1: Skipped. NUM_DAILY [$ARCHIVE_DAYS], DRY_RUN [$dry_run]
-    fi
-    
+    archive_docker
+
     LogInfo PHASE 2: Run rsync to copy files BEFORE docker stop
     if [ "$RUNNING" == "true" ] && [ ! "$TIMEOUT" == "0" ]; then        
         LogVerbose PHASE 2: rsync -a $PROGRESS -h ${pre_excludes[@]} $DRYRUN $S_PATH/ $D_PATH/
         rsync -a $PROGRESS -h ${pre_excludes[@]} $DRYRUN $S_PATH/ $D_PATH/
-        LogInfo PHASE 2: STOP $D_NAME with timeout: $TIMEOUT
-        if [ "$dry_run" == "0" ]; then
-            STOPPED_DOCKER=$D_NAME
-            LogInfo PHASE 2: STOPPED docker $(docker stop -t $TIMEOUT $D_NAME)
-        fi
+        stop_docker $D_NAME $TIMEOUT
     else
         LogInfo PHASE 2: Skipped because either docker state [$RUNNING] is not running or Timeout [$TIMEOUT] specified as 0 to prevent docker stop.
     fi
@@ -215,20 +273,19 @@ backup_docker() {
     rsync -a $PROGRESS -h ${full_excludes[@]} --delete $DRYRUN $S_PATH/ $D_PATH/
     
     LogInfo "PHASE 4: Start docker if previously running"
-    if [[ ! "$FORCESTART" == "false" ]] || [[ "$RUNNING" == "true" && ! "$TIMEOUT" == "0" ]]; then
-        LogInfo PHASE 4: START $D_NAME
-        if [ "$dry_run" == "0" ];then
-           LogInfo PHASE 4: STARTED docker $(docker start $D_NAME)
-           STOPPED_DOCKER=""
-        fi
+
+    local autostart=$(cat /var/lib/docker/unraid-autostart | cut -f 1 -d " " | egrep "^${D_NAME}$")
+    LogInfo autostart = $autostart
+    if [[ ! "$FORCESTART" == "false" ]] || [[ "$autostart" == "$D_NAME" ]] || [[ "$RUNNING" == "true" && ! "$TIMEOUT" == "0" ]]; then
+       start_docker $D_NAME
     else
-        LogInfo PHASE 4: Skipped. FORCESTART [$FORCESTART], RUNNING [$RUNNING], TIMEOUT [$TIMEOUT]
+        LogInfo PHASE 4: Docker Start Skipped. FORCESTART [$FORCESTART], RUNNING [$RUNNING], TIMEOUT [$TIMEOUT]
     fi
 
-    [ "$dry_run" == "0" ] && [ -d $DAILY_LOCATION ] && [ ! "$ARCHIVE_DAYS" == "0" ] && find $A_PATH -mtime +${ARCHIVE_DAYS} -name '*.tgz' -delete
+    [ "$dry_run" == "0" ] && [ -d $A_PATH ] && [ ! "$ARCHIVE_DAYS" == "0" ] && find $A_PATH -mtime +${ARCHIVE_DAYS} -name '*.tgz' -delete
 
     echo ""
-    echo End Time: $(date)
+    echo End Time: $(date) [Elapsed $(( SECONDS-$START_TIME )) Seconds]
     echo =================================================================
     echo ""
 }
@@ -254,26 +311,42 @@ done
 # exit
 
 # flash drive backup
+function BackupFlash() {
+
 if [[ ! "$create_only" == "1" && "$docker_name" == "" ]]; then
     LogInfo Starting Flash Backup...
-    backup_file=`/usr/local/emhttp/webGui/scripts/flash_backup`
-    if [ -f /$backup_file ]; then
-       mkdir -p $BACKUP_LOCATION/Flash/Archive
-       mv /$backup_file $BACKUP_LOCATION/Flash/Archive
-       find $BACKUP_LOCATION/Flash/Archive -mtime +${NUM_DAILY} -name '*.zip' -delete
+    if [[ ! "$dry_run" == "0" ]]; then
+       LogInfo "Skipping /usr/local/emhttp/webGui/scripts/flash_backup in dry run"
+    else
+        backup_file=`/usr/local/emhttp/webGui/scripts/flash_backup`
+        if [ -f /$backup_file ]; then
+           mkdir -p $BACKUP_LOCATION/Flash/Archive
+           mv /$backup_file $BACKUP_LOCATION/Flash/Archive
+           find $BACKUP_LOCATION/Flash/Archive -mtime +${NUM_DAILY} -name '*.zip' -delete
+        fi
     fi
     if [ -d /boot ]; then
         [ ! -d $BACKUP_LOCATION/Flash ] && mkdir -p $BACKUP_LOCATION/Flash
         LogVerbose rsync -a -h --delete $PROGRESS $DRYRUN /boot $BACKUP_LOCATION/Flash
-        rsync -a -h --delete $PROGRESS $DRYRUN /boot $BACKUP_LOCATION/Flash
-        [ "$dry_run" == "0" ] && mv $BACKUP_LOCATION/Flash/boot/config/super.dat $BACKUP_LOCATION/Flash/boot/config/super.dat.CA_BACKUP
+        if [[ "$dry_run" == "0" ]]; then
+            rsync -a -h --delete $PROGRESS $DRYRUN /boot $BACKUP_LOCATION/Flash
+            mv $BACKUP_LOCATION/Flash/boot/config/super.dat $BACKUP_LOCATION/Flash/boot/config/super.dat.CA_BACKUP
+        fi
     fi
     LogInfo Flash Backup completed.
 fi
+}
+
+BackupFlash
 
 # docker backup
 if [[ "$docker_name" == "" ]]; then
-    containers=$(docker ps -a | awk '{if(NR>1) print $NF}' | sort -f)
+    if [[ -f /boot/config/plugins/dockerMan/userprefs.cfg ]]; then
+        containers=$(cat /boot/config/plugins/dockerMan/userprefs.cfg | cut -f 2 -d \" | egrep -v "\-folder$")
+    fi
+    if [[ "$containers" == "" ]]; then
+        containers=$(docker ps -a | awk '{if(NR>1) print $NF}' | sort -f)
+    fi
     for container in $containers; do
         backup_docker $container
     done
@@ -282,7 +355,7 @@ else
     if [[ ! "$container" == "" ]]; then
         backup_docker $docker_name
     else
-        LogWarning Could not find $docker_name. Run docker ps command to check.
+        LogWarning Could not find $docker_name. Run docker ps -a command to check.
         echo
     fi
 fi
