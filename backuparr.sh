@@ -161,6 +161,7 @@ function create_config(){
         if [ -f "$script_path/sample-configs/$CONF_NAME" ]
         then
             cp -f $script_path/sample-configs/$CONF_NAME $T_PATH/$CONF_NAME
+            . $T_PATH/$CONF_NAME
         else
             cp -f $script_path/sample-configs/default-backup.conf $T_PATH/$CONF_NAME
         fi
@@ -185,10 +186,15 @@ function create_config(){
 
 
 function archive_docker() {
-    [ ! -d $A_PATH ] && [ ! "$ARCHIVE_DAYS" == "0" ] && mkdir -p $A_PATH
+
+    [[ "$ARCHIVE_DAYS" == "0" ]] && ARCHIVE_DAYS=1
+
+    [ ! -d $A_PATH ] && mkdir -p $A_PATH
+
+    [ "$dry_run" == "0" ] && [ -d $A_PATH ] && find $A_PATH -mtime +${ARCHIVE_DAYS} -name '*.tgz' -delete
 
     LogInfo PHASE 1: Archive $D_PATH to $A_FILE
-    if [ -d $A_PATH ] && [ ! -f $A_FILE ] && [ -d $D_PATH ] && [ ! "$ARCHIVE_DAYS" == "0" ]; then
+    if [ -d $A_PATH ] && [ ! -f $A_FILE ] && [ -d $D_PATH ]; then
         LogVerbose PHASE 1: tar -czf $A_FILE -C $D_PATH .
         [[ "$dry_run" == "0" ]] && tar -czf $A_FILE -C $D_PATH .
     else
@@ -235,9 +241,7 @@ function backup_docker() {
 
     if [ ! "$EXCLUDES" == "" ]; then
         for item in "${EXCLUDES[@]}"; do
-            pre_excludes+=(--exclude "$item")            
-        done        
-        for item in "${EXCLUDES[@]}"; do
+            pre_excludes+=(--exclude "$item")
             full_excludes+=(--exclude "$item")
         done
     fi
@@ -257,20 +261,18 @@ function backup_docker() {
     [ ! "$EXCLUDES" == "" ] && printf "Excludes: \t (${EXCLUDES[*]})\n"
     echo ""
 
-    archive_docker
-
     LogInfo PHASE 2: Run rsync to copy files BEFORE docker stop
     if [ "$RUNNING" == "true" ] && [ ! "$TIMEOUT" == "0" ]; then        
         LogVerbose PHASE 2: rsync -a $PROGRESS -h ${pre_excludes[@]} $DRYRUN $S_PATH/ $D_PATH/
         rsync -a $PROGRESS -h ${pre_excludes[@]} $DRYRUN $S_PATH/ $D_PATH/
         stop_docker $D_NAME $TIMEOUT
     else
-        LogInfo PHASE 2: Skipped because either docker state [$RUNNING] is not running or Timeout [$TIMEOUT] specified as 0 to prevent docker stop.
+        LogInfo PHASE 2: Skipped Docker Stop because either docker state:$RUNNING is not running or Timeout [$TIMEOUT] is 0.
     fi
     
     LogInfo PHASE 3: Run rsync to copy files AFTER docker stop
-    LogVerbose PHASE 3: rsync -a $PROGRESS -h ${full_excludes[@]} --delete $DRYRUN $S_PATH/ $D_PATH/
-    rsync -a $PROGRESS -h ${full_excludes[@]} --delete $DRYRUN $S_PATH/ $D_PATH/
+    LogVerbose PHASE 3: rsync -a $PROGRESS -h ${full_excludes[@]} --delete --delete-excluded $DRYRUN $S_PATH/ $D_PATH/
+    rsync -a $PROGRESS -h ${full_excludes[@]} --delete --delete-excluded $DRYRUN $S_PATH/ $D_PATH/
     
     LogInfo "PHASE 4: Start docker if previously running"
 
@@ -282,9 +284,9 @@ function backup_docker() {
         LogInfo PHASE 4: Docker Start Skipped. FORCESTART [$FORCESTART], RUNNING [$RUNNING], TIMEOUT [$TIMEOUT]
     fi
 
-    [ "$dry_run" == "0" ] && [ -d $A_PATH ] && [ ! "$ARCHIVE_DAYS" == "0" ] && find $A_PATH -mtime +${ARCHIVE_DAYS} -name '*.tgz' -delete
+    archive_docker
 
-    echo ""
+echo ""
     echo End Time: $(date) [Elapsed $(( SECONDS-$START_TIME )) Seconds]
     echo =================================================================
     echo ""
@@ -325,14 +327,6 @@ if [[ ! "$create_only" == "1" && "$docker_name" == "" ]]; then
            find $BACKUP_LOCATION/Flash/Archive -mtime +${NUM_DAILY} -name '*.zip' -delete
         fi
     fi
-    if [ -d /boot ]; then
-        [ ! -d $BACKUP_LOCATION/Flash ] && mkdir -p $BACKUP_LOCATION/Flash
-        LogVerbose rsync -a -h --delete $PROGRESS $DRYRUN /boot $BACKUP_LOCATION/Flash
-        if [[ "$dry_run" == "0" ]]; then
-            rsync -a -h --delete $PROGRESS $DRYRUN /boot $BACKUP_LOCATION/Flash
-            mv $BACKUP_LOCATION/Flash/boot/config/super.dat $BACKUP_LOCATION/Flash/boot/config/super.dat.CA_BACKUP
-        fi
-    fi
     LogInfo Flash Backup completed.
 fi
 }
@@ -347,7 +341,7 @@ if [[ "$docker_name" == "" ]]; then
     if [[ "$containers" == "" ]]; then
         containers=$(docker ps -a | awk '{if(NR>1) print $NF}' | sort -f)
     fi
-    for container in $containers; do
+for container in $containers; do
         backup_docker $container
     done
 else
@@ -370,15 +364,16 @@ fi
 
 echo "---- Starting Onedrive upload [$(date)] ----"
 echo ""
-
+RCLONE="/usr/sbin/rclone sync -v --exclude Live/** --onedrive-chunk-size 70M --retries 1 --checkers 16 --transfers 6 --fast-list --copy-links"
 if [[ $script_path =~ \/boot\/repos.* ]]; then # one-line stats when running from user scripts
-    LogInfo rclone sync --checkers 16 --transfers 16 --fast-list --copy-links $BACKUP_LOCATION $ONEDRIVE_LOCATION
+    LogInfo $RCLONE $BACKUP_LOCATION $ONEDRIVE_LOCATION
     LogInfo rclone is working. Waiting...
-    /usr/sbin/rclone sync --checkers 16 --transfers 16 --fast-list --copy-links $BACKUP_LOCATION $ONEDRIVE_LOCATION
+    $RCLONE $BACKUP_LOCATION $ONEDRIVE_LOCATION
 else
-    LogVerbose rclone sync --progress --checkers 16 --transfers 16 --fast-list --copy-links $BACKUP_LOCATION $ONEDRIVE_LOCATION
-    /usr/sbin/rclone sync --progress --checkers 16 --transfers 16 --fast-list --copy-links $BACKUP_LOCATION $ONEDRIVE_LOCATION
+    LogVerbose $RCLONE --progress $BACKUP_LOCATION $ONEDRIVE_LOCATION
+    $RCLONE --progress $BACKUP_LOCATION $ONEDRIVE_LOCATION
 fi
+
 
 SUCCESS="true"
 echo ""
