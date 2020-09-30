@@ -79,15 +79,15 @@ function ExitFunc() {
 }
 
 function NotifyInfo() {
-    if [[ $script_path =~ \/boot\/repos.* ]]; then # one-line stats when running from user scripts
-        /usr/local/emhttp/webGui/scripts/notify -e "$1" -d "$2" -i "normal"
+    if [[ $script_path =~ \/boot\/repos.* ]]; then
+        /usr/local/emhttp/webGui/scripts/notify -e "[Backuparr]" -s "$1" -d "$2" -i "normal"
     fi
     echo $1 - $2
 }
 
 function NotifyError() {
-    if [[ $script_path =~ \/boot\/repos.* ]]; then # one-line stats when running from user scripts
-        /usr/local/emhttp/webGui/scripts/notify -e "$1" -d "$2" -i "alert"
+    if [[ $script_path =~ \/boot\/repos.* ]]; then
+        /usr/local/emhttp/webGui/scripts/notify -e "[Backuparr]" -s "$1" -d "$2" -i "alert"
     fi
     echo [ERROR] $1 - $2
 }
@@ -383,7 +383,7 @@ echo "---- Starting Onedrive upload [$(date)] ----"
 echo ""
 op="[RCLONE]"
 RCLONE="/usr/sbin/rclone sync -v --exclude Live/** --onedrive-chunk-size 70M --retries 1 --checkers 16 --transfers 6 --fast-list --copy-links"
-if [[ $script_path =~ \/boot\/repos.* ]]; then # one-line stats when running from user scripts
+if [[ $script_path =~ \/boot\/repos.* ]]; then
     LogInfo $op: $RCLONE $BACKUP_LOCATION $ONEDRIVE_LOCATION
     LogInfo $op: rclone is working. Waiting...
     $RCLONE $BACKUP_LOCATION $ONEDRIVE_LOCATION
