@@ -11,6 +11,7 @@ EXCLUDE=(profile/lock log/ Log/ logs/ Logs/ '*.log' log.txt '*.log.*' '*.pid' '*
 EXCLUDEPRE=('*.db' '*.xml' '*.dat' '*.dat.old' '*.db-*' '*.ini' '*.conf' '*.json' '*.ejs' BT_backup/ databases/ '*.sqlite*' '*.sqlite')
 
 script_path=$(dirname $(realpath -s $0))
+is_user_script=0
 now=$(date +"%Y-%m-%d")
 create_only=0
 dry_run=0
@@ -19,7 +20,7 @@ skip_onedrive=0
 docker_name=""
 STOPPED_DOCKER=""
 
-while getopts "h?cfdvsn:" opt; do
+while getopts "h?cufdvsn:" opt; do
     case "$opt" in
     h | \?)
         echo Options:
@@ -28,6 +29,7 @@ while getopts "h?cfdvsn:" opt; do
         echo "-s : Skip OneDrive Upload"
         echo "-c : Create Backup.config files only"
         echo "-n [docker] : Only backup this single docker"
+        echo "-u : Use when calling from Unraid User.Scripts to adjust output to not flood logs"
         exit 0
         ;;
     c)
@@ -43,6 +45,9 @@ while getopts "h?cfdvsn:" opt; do
         ;;
     s)
         skip_onedrive=1
+        ;;
+    u)
+        is_user_script=1
         ;;
     n)
         docker_name=${OPTARG}
@@ -79,14 +84,14 @@ function ExitFunc() {
 }
 
 function NotifyInfo() {
-    if [[ $script_path =~ \/boot\/repos.* ]]; then
+    if [[ $is_user_script = 1 ]]; then
         /usr/local/emhttp/webGui/scripts/notify -e "[Backuparr]" -s "$1" -d "$2" -i "normal"
     fi
     echo $1 - $2
 }
 
 function NotifyError() {
-    if [[ $script_path =~ \/boot\/repos.* ]]; then
+    if [[ $is_user_script = 1 ]]; then
         /usr/local/emhttp/webGui/scripts/notify -e "[Backuparr]" -s "$1" -d "$2" -i "alert"
     fi
     echo [ERROR] $1 - $2
@@ -383,7 +388,7 @@ echo "---- Starting Onedrive upload [$(date)] ----"
 echo ""
 op="[RCLONE]"
 RCLONE="/usr/sbin/rclone sync -v --exclude Live/** --onedrive-chunk-size 70M --retries 1 --checkers 16 --transfers 6 --fast-list --copy-links"
-if [[ $script_path =~ \/boot\/repos.* ]]; then
+if [[ $is_user_script = 1 ]]; then
     LogInfo $op: $RCLONE $BACKUP_LOCATION $ONEDRIVE_LOCATION
     LogInfo $op: rclone is working. Waiting...
     $RCLONE $BACKUP_LOCATION $ONEDRIVE_LOCATION
