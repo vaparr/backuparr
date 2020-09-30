@@ -59,19 +59,23 @@ function converttime() {
     printf "%02d minutes, %02d seconds" $m $s
 }
 
-trap 'ExitFunc' exit
+trap 'ExitFunc' exit SIGINT SIGTERM
 SUCCESS="false"
 function ExitFunc() {
     local time_m=$(converttime $SECONDS)
-    if [[ ! "$SUCCESS" == "true" ]]; then
-        NotifyError "[Backuparr exited]" "Script exited abnormally after $time_m."
-    else
-        NotifyInfo "[Backuparr exited]" "Script exited normally after $time_m."
-    fi
 
     if [[ ! "$STOPPED_DOCKER" == "" ]]; then
         docker start $STOPPED_DOCKER
     fi
+
+    if [[ ! "$SUCCESS" == "true" ]]; then
+        NotifyError "[Backuparr exited]" "Script exited abnormally after $time_m."
+        exit 255
+    else
+        NotifyInfo "[Backuparr exited]" "Script exited normally after $time_m."
+        exit 0
+    fi
+
 }
 
 function NotifyInfo() {
