@@ -83,8 +83,8 @@ function ExitFunc() {
 
 }
 
-trap 'ReturnFunc' return
-function ReturnFunc() {
+trap 'ShouldExit' return
+function ShouldExit() {
     if [[ "$PPID" == "1" ]]; then
         ExitFunc
     fi
@@ -105,14 +105,17 @@ function NotifyError() {
 
 function LogInfo() {
     echo "$@"
+    ShouldExit
 }
 
 function LogVerbose() {
     [ "$verbose" == "1" ] && echo "$@"
+    ShouldExit
 }
 
 function LogWarning() {
     echo "[WARNING] $@"
+    ShouldExit
 }
 
 function LogError() {
