@@ -70,7 +70,7 @@ function ExitFunc() {
     local time_m=$(converttime $SECONDS)
 
     if [[ ! "$STOPPED_DOCKER" == "" ]]; then
-        docker start $STOPPED_DOCKER
+        docker start $STOPPED_DOCKER &
     fi
 
     if [[ ! "$SUCCESS" == "true" ]]; then
@@ -83,6 +83,12 @@ function ExitFunc() {
 
 }
 
+trap 'ReturnFunc' return
+function ReturnFunc() {
+    if [[ "$PPID" == "1" ]]; then
+        ExitFunc
+    fi
+}
 function NotifyInfo() {
     if [[ $is_user_script = 1 ]]; then
         /usr/local/emhttp/webGui/scripts/notify -e "[Backuparr]" -s "$1" -d "$2" -i "normal"
