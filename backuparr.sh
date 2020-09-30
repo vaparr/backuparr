@@ -86,8 +86,8 @@ function ExitFunc() {
 trap 'ShouldExit' return
 function ShouldExit() {
 
-    pid=$(cut -d' ' -f4 < /proc/self/stat)
-
+    pid=$(cut -d' ' -f4 < /proc/$$/stat)
+    echo "PPID: $PPID pid: $pid"
 
     if [[ "$PPID" != "$pid" ]]; then 
        echo "Parent has died. Exiting."

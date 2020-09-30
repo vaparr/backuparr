@@ -1,13 +1,15 @@
 #!/bin/bash
-#description=Unraid backup script
 #arrayStarted=true
-#name=backuparr
-
-REPO_LOCATION=/boot/repos
 REPO_NAME=backuparr
-SCRIPT_NAME=backuparr.sh
+REPO_LOCATION=/tmp/$REPO_NAME
 REPO_URL=https://github.com/vaparr/$REPO_NAME.git
+SCRIPT_NAME=backuparr.sh
+
+trap "kill -- $$" exit SIGINT SIGTERM SIGHUP SIGPIPE SIGQUIT
 
 [ ! -d $REPO_LOCATION ] && mkdir -p $REPO_LOCATION && cd $REPO_LOCATION && git clone $REPO_URL
 cd $REPO_LOCATION/$REPO_NAME && git pull
-/bin/bash $REPO_LOCATION/$REPO_NAME/$SCRIPT_NAME
+chmod +x $REPO_LOCATION/$REPO_NAME/$SCRIPT_NAME
+exec /bin/bash $REPO_LOCATION/$REPO_NAME/$SCRIPT_NAME -u
+
+
