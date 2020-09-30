@@ -64,7 +64,7 @@ function converttime() {
     printf "%02d minutes, %02d seconds" $m $s
 }
 
-trap 'ExitFunc' exit SIGINT SIGTERM
+trap 'ExitFunc' exit SIGINT SIGTERM SIGHUP SIGPIPE SIGQUIT
 SUCCESS="false"
 function ExitFunc() {
     local time_m=$(converttime $SECONDS)
