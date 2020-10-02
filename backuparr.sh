@@ -401,14 +401,14 @@ fi
 echo "---- Starting Onedrive upload [$(date)] ----"
 echo ""
 op="[RCLONE]"
-RCLONE="/usr/sbin/rclone sync -v --exclude Live/** --onedrive-chunk-size 70M --retries 1 --checkers 16 --transfers 6 --fast-list --copy-links"
+RCLONE="/usr/sbin/rclone sync --exclude Live/** --onedrive-chunk-size 70M --retries 3 --checkers 16 --transfers 6 --fast-list --copy-links"
 if [[ $is_user_script = 1 ]]; then
     LogInfo $op: $RCLONE $BACKUP_LOCATION $ONEDRIVE_LOCATION
     LogInfo $op: rclone is working. Waiting...
     $RCLONE $BACKUP_LOCATION $ONEDRIVE_LOCATION
 else
     LogVerbose $op: $RCLONE --progress $BACKUP_LOCATION $ONEDRIVE_LOCATION
-    $RCLONE --progress $BACKUP_LOCATION $ONEDRIVE_LOCATION
+    $RCLONE -v --progress $BACKUP_LOCATION $ONEDRIVE_LOCATION
 fi
 if [[ $? -ne 0 ]]; then
     LogError "$op: rclone failed"
