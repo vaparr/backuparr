@@ -142,6 +142,8 @@ function stop_docker() {
     if [ "$dry_run" == "0" ]; then
         STOPPED_DOCKER=$1
         LogInfo $op: STOPPED docker $(docker stop -t $2 $1) in $((SECONDS - $stop_seconds)) Seconds
+    else
+        return
     fi
     RUNNING=$(docker container inspect -f '{{.State.Running}}' $1)
 
@@ -165,6 +167,8 @@ function start_docker() {
     if [ "$dry_run" == "0" ]; then
         LogInfo $op: STARTED docker $(docker start $1) in $((SECONDS - $start_seconds)) Seconds
         STOPPED_DOCKER=""
+    else
+        return
     fi
     RUNNING=$(docker container inspect -f '{{.State.Running}}' $1)
     if [[ "$RUNNING" == "true" ]]; then
@@ -351,6 +355,31 @@ function BackupFlash() {
     fi
 }
 
+function GetDockerList() {
+
+    local containers=""
+
+    if [[ -f /boot/config/plugins/dockerMan/userprefs.cfg ]]; then
+        containers=$(cat /boot/config/plugins/dockerMan/userprefs.cfg | cut -f 2 -d \" | egrep -v "\-folder$")
+    fi
+    local containers_from_docker=$(docker ps -a | awk '{if(NR>1) print $NF}' | sort -f)
+
+    if [[ "$containers" != "" ]]; then
+        echo $containers
+        for container_from_docker in $containers_from_docker; do
+            local already_found=$(echo $containers | egrep $container_from_docker)
+            if [ "$already_found" == "" ]; then
+               echo $container_from_docker
+            fi
+        done
+    else
+       echo $containers_from_docker
+    fi
+
+
+}
+
+
 echo ""
 echo "---- Backup Started [$(date)] ----"
 echo ""
@@ -370,14 +399,10 @@ done
 BackupFlash
 
 # docker backup
+
+
 if [[ "$docker_name" == "" ]]; then
-    if [[ -f /boot/config/plugins/dockerMan/userprefs.cfg ]]; then
-        containers=$(cat /boot/config/plugins/dockerMan/userprefs.cfg | cut -f 2 -d \" | egrep -v "\-folder$")
-    fi
-    if [[ "$containers" == "" ]]; then
-        containers=$(docker ps -a | awk '{if(NR>1) print $NF}' | sort -f)
-    fi
-    for container in $containers; do
+    for container in $(GetDockerList); do
         backup_docker $container
     done
 else
