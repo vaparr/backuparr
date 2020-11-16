@@ -20,7 +20,7 @@ skip_onedrive=0
 docker_name=""
 STOPPED_DOCKER=""
 
-while getopts "h?cufdvsn:" opt; do
+while getopts "h?cufdvsn:b:o:" opt; do
     case "$opt" in
     h | \?)
         echo Options:
@@ -30,6 +30,8 @@ while getopts "h?cufdvsn:" opt; do
         echo "-c : Create Backup.config files only"
         echo "-n [docker] : Only backup this single docker"
         echo "-u : Use when calling from Unraid User.Scripts to adjust output to not flood logs"
+        echo "-b : Backup location"
+        echo "-o : OneDrive location"
         exit 0
         ;;
     c)
@@ -51,6 +53,12 @@ while getopts "h?cufdvsn:" opt; do
         ;;
     n)
         docker_name=${OPTARG}
+        ;;
+    b)
+        BACKUP_LOCATION=${OPTARG}
+        ;;
+    o)
+        ONEDRIVE_LOCATION=${OPTARG}
         ;;
         #f)
         #output_file=$OPTARG
