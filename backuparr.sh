@@ -3,7 +3,7 @@
 SECONDS=0
 BACKUP_LOCATION=/mnt/user/backup
 NUM_DAILY=3
-ONEDRIVE_LOCATION=onedrive:unraid/backup
+ONEDRIVE_LOCATION=""
 DEFAULT_TIMEOUT=30
 DRYRUN=""
 PROGRESS="--info=progress2"
@@ -426,7 +426,7 @@ fi
 echo "---- Backup Complete [$(date)] ----"
 echo ""
 
-if [[ "$create_only" == "1" || "$dry_run" == "1" || "$skip_onedrive" == "1" ]]; then
+if [[ "$create_only" == "1" || "$dry_run" == "1" || "$skip_onedrive" == "1" || "$ONEDRIVE_LOCATION" == "" ]]; then
     SUCCESS="true"
     exit
 fi
