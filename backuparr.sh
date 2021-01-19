@@ -321,7 +321,7 @@ function backup_docker() {
         LogError "$op: RSYNC RUN 2 Failed"
     fi
 
-    LogInfo "$op: Start docker if previously running"
+    LogInfo "$op: Start docker if previously running, autostart is enabled, or forcestart is true"
 
     local autostart=$(cat /var/lib/docker/unraid-autostart | cut -f 1 -d " " | egrep "^${D_NAME}$")
     LogVerbose $op: autostart = $autostart
