@@ -19,14 +19,16 @@ verbose=0
 skip_onedrive=0
 docker_name=""
 STOPPED_DOCKER=""
+archive_backups=0
 
-while getopts "h?cufdvsn:b:o:" opt; do
+while getopts "h?cufdvsan:b:o:" opt; do
     case "$opt" in
     h | \?)
         echo Options:
         echo "-d : Dry Run"
         echo "-v : Verbose"
         echo "-s : Skip OneDrive Upload"
+        echo "-a : Archive live backup to tgz (configure ARCHIVE_DAYS in DockerName-backup.conf)"
         echo "-c : Create Backup.config files only"
         echo "-n [docker] : Only backup this single docker"
         echo "-u : Use when calling from Unraid User.Scripts to adjust output to not flood logs"
@@ -47,6 +49,9 @@ while getopts "h?cufdvsn:b:o:" opt; do
         ;;
     s)
         skip_onedrive=1
+        ;;
+    a)
+        archive_backups=1
         ;;
     u)
         is_user_script=1
@@ -295,8 +300,8 @@ function backup_docker() {
 
     printf "Dest Path: \t $D_PATH\n"
     printf "Source Path: \t $S_PATH\n"
-    printf "Archive Path: \t $A_PATH\n"
-    printf "Archive File: \t $A_FILE\n"
+    [ "$archive_backups" == "1" ] && printf "Archive Path: \t $A_PATH\n"
+    [ "$archive_backups" == "1" ] && printf "Archive File: \t $A_FILE\n"
     printf "Running: \t $RUNNING\n"
     printf "Stop Timeout: \t $TIMEOUT\n"
     [ ! "$EXCLUDES" == "" ] && printf "Excludes: \t (${EXCLUDES[*]})\n"
@@ -331,7 +336,7 @@ function backup_docker() {
         LogInfo $op: Docker Start Skipped. FORCESTART [$FORCESTART], RUNNING [$RUNNING], TIMEOUT [$TIMEOUT]
     fi
 
-    archive_docker
+    [ "$archive_backups" == "1" ] && archive_docker
 
     echo ""
     echo End Time: $(date) [Elapsed $((SECONDS - $START_TIME)) Seconds]
