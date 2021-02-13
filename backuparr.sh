@@ -359,9 +359,9 @@ function BackupFlash() {
             fi
 
             if [ -f /$backup_file ]; then
-                mkdir -p $BACKUP_LOCATION/Flash/Archive
-                mv /$backup_file $BACKUP_LOCATION/Flash/Archive
-                find $BACKUP_LOCATION/Flash/Archive -mtime +${NUM_DAILY} -name '*.zip' -delete
+                mkdir -p $BACKUP_LOCATION/Flash
+                mv /$backup_file $BACKUP_LOCATION/Flash
+                find $BACKUP_LOCATION/Flash -mtime +${NUM_DAILY} -name '*.zip' -delete
             fi
         fi
         LogInfo $op: Flash Backup completed.
