@@ -282,6 +282,8 @@ function backup_docker() {
 
     [ ! -d $D_PATH ] && mkdir -p $D_PATH
 
+    touch $D_PATH
+    
     local pre_excludes=${exclude_opts_pre[@]}
     local full_excludes=${exclude_opts[@]}
 
