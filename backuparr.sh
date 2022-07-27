@@ -273,8 +273,9 @@ function backup_docker() {
     docker inspect $D_NAME >$T_PATH/$D_NAME-dockerconfig.json
 
     local S_PATH=""
-    if [ -d "/mnt/cache/appdata/$D_NAME" ]; then
+    if [ -d "/mnt/cache/appdata/$D_NAME" ]; then        
         S_PATH="/mnt/user/appdata/$D_NAME"
+        LogInfo "Using $S_PATH as backup source"
     fi
     
     if [ "$S_PATH" == "" ]; then
