@@ -272,7 +272,15 @@ function backup_docker() {
 
     docker inspect $D_NAME >$T_PATH/$D_NAME-dockerconfig.json
 
-    local S_PATH=$(docker inspect -f '{{json .Mounts }}' $D_NAME | jq .[].Source | grep appdata/ | grep -i $D_NAME | head -1 | cut -f 2 -d \" | tr -d '\n')
+    local S_PATH = ""
+    if [ -d "/mnt/cache/appdata/$D_NAME" ]; then
+        S_PATH = "/mnt/user/appdata/$D_NAME"
+    fi
+    
+    if [ "$S_PATH" == "" ]; then
+        S_PATH=$(docker inspect -f '{{json .Mounts }}' $D_NAME | jq .[].Source | grep appdata/ | grep -i $D_NAME | head -1 | cut -f 2 -d \" | tr -d '\n')
+    fi
+    
     if [ "$S_PATH" == "" ]; then
         S_PATH=$(docker inspect -f '{{json .Mounts }}' $D_NAME | jq .[].Source | grep appdata/ | head -1 | cut -f 2 -d \" | tr -d '\n')
     fi
