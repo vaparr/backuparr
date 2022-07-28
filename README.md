@@ -23,24 +23,24 @@ This will create the .conf files in /mnt/user/backup/Docker/<name>/<name>-backup
 
 It will look like this by default:
 
-  # docker timeout before force kill. Set to 0 to not stop the docker when backing it up
-  #TIMEOUT=30
-
-  #false will prevent the docker from being backed up. Default True
-  #BACKUP="false"
-
-  #true will start the docker even if it wasnt running when the backup started
-  #FORCESTART="true"
-
-  #Per Docker Excludes
-  #EXCLUDES=(data/metadata cache/ '*.tmp')
-
-  #Number of Archive tarred backups
-  #ARCHIVE_DAYS=3
+<p>  # docker timeout before force kill. Set to 0 to not stop the docker when backing it up</p>
+<p>  #TIMEOUT=30</p>
+<p></p>
+<p>  #false will prevent the docker from being backed up. Default True</p>
+<p>  #BACKUP="false"</p>
+<p></p>
+<p>  #true will start the docker even if it wasnt running when the backup started</p>
+<p>  #FORCESTART="true"</p>
+<p></p>
+<p>  #Per Docker Excludes</p>
+<p>  #EXCLUDES=(data/metadata cache/ '\*.tmp')</p>
+<p></p>
+ <p> #Number of Archive tarred backups</p>
+ <p> #ARCHIVE_DAYS=3</p>
 
 This is where you can override the defaults.  For example, if you change
 
-  #TIMEOUT=30
+  \#TIMEOUT=30
 
 to
 
