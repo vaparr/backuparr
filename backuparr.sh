@@ -21,7 +21,7 @@ docker_name=""
 STOPPED_DOCKER=""
 archive_backups=0
 
-while getopts "h?cufdvsan:b:o:" opt; do
+while getopts "h?cufdvsan:b:o:y:" opt; do
     case "$opt" in
     h | \?)
         echo Options:
@@ -33,7 +33,8 @@ while getopts "h?cufdvsan:b:o:" opt; do
         echo "-n [docker] : Only backup this single docker"
         echo "-u : Use when calling from Unraid User.Scripts to adjust output to not flood logs"
         echo "-b : Backup location"
-        echo "-o : OneDrive location"
+        echo "-o : OneDrive location (configure in rclone)"
+        echo "-y : Sets the number of archive days. Defaults to 3, can be overridden in .conf"
         exit 0
         ;;
     c)
@@ -61,6 +62,9 @@ while getopts "h?cufdvsan:b:o:" opt; do
         ;;
     b)
         BACKUP_LOCATION=${OPTARG}
+        ;;
+    y)
+        NUM_DAILY=${OPTARG}
         ;;
     o)
         ONEDRIVE_LOCATION=${OPTARG}
