@@ -7,6 +7,17 @@ SCRIPT_NAME=backuparr.sh
 
 trap "kill -- $$" exit SIGINT SIGTERM SIGHUP SIGPIPE SIGQUIT
 
+    echo Options:
+        echo "-d : Dry Run"
+        echo "-v : Verbose"
+        echo "-s : Skip OneDrive Upload"
+        echo "-a : Archive live backup to tgz (configure ARCHIVE_DAYS in DockerName-backup.conf)"
+        echo "-c : Create Backup.config files only"
+        echo "-n [docker] : Only backup this single docker"
+        echo "-u : Use when calling from Unraid User.Scripts to adjust output to not flood logs"
+        echo "-b : Backup location"
+        echo "-o : OneDrive location"
+
 [ ! -d $REPO_LOCATION ] && mkdir -p $REPO_LOCATION && cd $REPO_LOCATION && git clone $REPO_URL
 cd $REPO_LOCATION/$REPO_NAME && git fetch --all && git reset --hard origin/master && git pull --ff-only
 chmod +x $REPO_LOCATION/$REPO_NAME/$SCRIPT_NAME
