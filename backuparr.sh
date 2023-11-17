@@ -411,7 +411,7 @@ function GetDockerList() {
 echo ""
 echo "---- Backup Started [$(date)] ----"
 echo ""
-
+/usr/local/emhttp/plugins/dynamix/scripts/notify -s "Backuparr" -d "Backup of appdata starting."
 # exclude options, RSYNC2
 exclude_opts=()
 for item in "${EXCLUDE[@]}"; do
