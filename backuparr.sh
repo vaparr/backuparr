@@ -76,9 +76,10 @@ while getopts "h?cufdvsan:b:o:y:" opt; do
 done
 
 function converttime() {
+    ((h = ${1}/3600))
     ((m = (${1} % 3600) / 60))
     ((s = ${1} % 60))
-    printf "%02d minutes, %02d seconds" $m $s
+    printf "%02d hours %02d minutes, %02d seconds" $h $m $s
 }
 
 trap 'ExitFunc' exit SIGINT SIGTERM SIGHUP SIGPIPE SIGQUIT
@@ -91,10 +92,10 @@ function ExitFunc() {
     fi
 
     if [[ ! "$SUCCESS" == "true" ]]; then
-        NotifyError "[Backuparr exited]" "Script exited abnormally after $time_m."
+        NotifyError "[Backuparr Failed]" "Script exited abnormally after $time_m."
         exit 255
     else
-        NotifyInfo "[Backuparr exited]" "Script exited normally after $time_m."
+        NotifyInfo "[Backuparr Successful]" "Script exited normally after $time_m."
         exit 0
     fi
 
