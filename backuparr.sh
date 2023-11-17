@@ -388,7 +388,7 @@ function GetDockerList() {
     local containers=""
 
     if [[ -f /boot/config/plugins/dockerMan/userprefs.cfg ]]; then
-        containers=$(cat /boot/config/plugins/dockerMan/userprefs.cfg | cut -f 2 -d \" | egrep -v "\-folder$")
+        containers=$(cat /boot/config/plugins/dockerMan/userprefs.cfg | cut -f 2 -d \" | egrep -v "\-folder$" | egrep -v "^folder-")
     fi
     local containers_from_docker=$(docker ps -a | awk '{if(NR>1) print $NF}' | sort -f)
 
