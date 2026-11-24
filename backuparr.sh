@@ -369,15 +369,26 @@ function BackupFlash() {
         if [[ ! "$dry_run" == "0" ]]; then
             LogInfo "$op: Skipping /usr/local/emhttp/webGui/scripts/flash_backup in dry run"
         else
-            backup_file=$(/usr/local/emhttp/webGui/scripts/flash_backup)
-            if [[ $? -ne 0 ]]; then
-                LogError "$op: flash_backup failed"
+            mkdir -p $BACKUP_LOCATION/Flash
+            local ver=$(sed -n 's/^version="\(.*\)"/\1/p' /etc/unraid-version)
+            local out="$BACKUP_LOCATION/Flash/$(hostname)-v${ver}-boot-backup-$(date +%Y%m%d-%H%M).zip"
+            local ok=0
+            if /usr/local/emhttp/webGui/scripts/flash_backup > "$out.partial"; then
+                if [ "$(head -c 2 "$out.partial")" == "PK" ]; then
+                    # 7.4+: helper streamed the zip to stdout
+                    mv "$out.partial" "$out" && ok=1
+                else
+                    # pre-7.4: helper wrote the zip to / and printed its name
+                    local f=$(head -c 4096 "$out.partial" | tr -d '\n')
+                    rm -f "$out.partial"
+                    [ -n "$f" ] && [ -f "/$f" ] && mv "/$f" $BACKUP_LOCATION/Flash/ && ok=1
+                fi
             fi
-
-            if [ -f /$backup_file ]; then
-                mkdir -p $BACKUP_LOCATION/Flash
-                mv /$backup_file $BACKUP_LOCATION/Flash
+            if [ "$ok" == "1" ]; then
                 find $BACKUP_LOCATION/Flash -mtime +${NUM_DAILY} -name '*.zip' -delete
+            else
+                rm -f "$out.partial"
+                LogError "$op: flash_backup failed"
             fi
         fi
         LogInfo $op: Flash Backup completed.
