@@ -369,15 +369,16 @@ function BackupFlash() {
         if [[ ! "$dry_run" == "0" ]]; then
             LogInfo "$op: Skipping /usr/local/emhttp/webGui/scripts/flash_backup in dry run"
         else
-            backup_file=$(/usr/local/emhttp/webGui/scripts/flash_backup)
-            if [[ $? -ne 0 ]]; then
-                LogError "$op: flash_backup failed"
-            fi
-
-            if [ -f /$backup_file ]; then
-                mkdir -p $BACKUP_LOCATION/Flash
-                mv /$backup_file $BACKUP_LOCATION/Flash
+            # Unraid 7.4+: flash_backup streams the zip to stdout
+            mkdir -p $BACKUP_LOCATION/Flash
+            local ver=$(sed -n 's/^version="\(.*\)"/\1/p' /etc/unraid-version)
+            local out="$BACKUP_LOCATION/Flash/$(hostname)-v${ver}-boot-backup-$(date +%Y%m%d-%H%M).zip"
+            if /usr/local/emhttp/webGui/scripts/flash_backup > "$out.partial" && [ -s "$out.partial" ]; then
+                mv "$out.partial" "$out"
                 find $BACKUP_LOCATION/Flash -mtime +${NUM_DAILY} -name '*.zip' -delete
+            else
+                rm -f "$out.partial"
+                LogError "$op: flash_backup failed"
             fi
         fi
         LogInfo $op: Flash Backup completed.
